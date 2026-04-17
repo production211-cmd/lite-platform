@@ -239,7 +239,7 @@ export default function ProductSubmission() {
 
       {/* Stepper */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-soft p-6 mb-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between" role="tablist" aria-label="Product submission steps">
           {STEPS.map((s, i) => {
             const Icon = s.icon;
             const isActive = step === s.id;
@@ -247,6 +247,11 @@ export default function ProductSubmission() {
             return (
               <div key={s.id} className="flex items-center flex-1">
                 <button
+                  role="tab"
+                  id={`step-tab-${s.id}`}
+                  aria-selected={isActive}
+                  aria-controls={`step-panel-${s.id}`}
+                  tabIndex={isActive ? 0 : -1}
                   onClick={() => { if (isComplete || isActive) setStep(s.id); }}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
                     isActive
@@ -280,7 +285,7 @@ export default function ProductSubmission() {
       {/* Step Content */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-soft p-6 lg:p-8">
         {/* Step 1: Basic Info */}
-        {step === 1 && (
+        {step === 1 && (<div role="tabpanel" id="step-panel-1" aria-labelledby="step-tab-1">
           <div className="space-y-6">
             <h2 className="font-heading text-lg tracking-wide text-gray-900 mb-4">Basic Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -377,10 +382,10 @@ export default function ProductSubmission() {
               </div>
             </div>
           </div>
-        )}
+        </div>)}
 
         {/* Step 2: Media */}
-        {step === 2 && (
+        {step === 2 && (<div role="tabpanel" id="step-panel-2" aria-labelledby="step-tab-2">
           <div className="space-y-6">
             <h2 className="font-heading text-lg tracking-wide text-gray-900 mb-4">Product Images</h2>
             {errors.images && (
@@ -435,10 +440,10 @@ export default function ProductSubmission() {
             </div>
             <p className="text-xs text-gray-400">Recommended: 2000x2000px, white background, max 8 images. First image is the hero.</p>
           </div>
-        )}
+        </div>)}
 
         {/* Step 3: Variants & Pricing */}
-        {step === 3 && (
+        {step === 3 && (<div role="tabpanel" id="step-panel-3" aria-labelledby="step-tab-3">
           <div className="space-y-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading text-lg tracking-wide text-gray-900">Variants & Pricing</h2>
@@ -517,10 +522,10 @@ export default function ProductSubmission() {
               </table>
             </div>
           </div>
-        )}
+        </div>)}
 
         {/* Step 4: Shipping & Compliance */}
-        {step === 4 && (
+        {step === 4 && (<div role="tabpanel" id="step-panel-4" aria-labelledby="step-tab-4">
           <div className="space-y-6">
             <h2 className="font-heading text-lg tracking-wide text-gray-900 mb-4">Shipping & Compliance</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -593,10 +598,10 @@ export default function ProductSubmission() {
               </div>
             </div>
           </div>
-        )}
+        </div>)}
 
         {/* Step 5: Review & Submit */}
-        {step === 5 && (
+        {step === 5 && (<div role="tabpanel" id="step-panel-5" aria-labelledby="step-tab-5">
           <div className="space-y-6">
             <h2 className="font-heading text-lg tracking-wide text-gray-900 mb-4">Review & Submit</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -642,7 +647,7 @@ export default function ProductSubmission() {
               </div>
             )}
           </div>
-        )}
+        </div>)}
       </div>
 
       {/* Navigation */}
