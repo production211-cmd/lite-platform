@@ -66,7 +66,7 @@ export default function PortalOrders() {
                 </div>
                 <div className="flex items-center gap-4 mt-1.5 text-xs text-slate-500">
                   <span>{o.items?.length || 0} items</span>
-                  <span>{formatCurrency(o.vendorEarnings || o.subtotal || 0)}</span>
+                  <span>{formatCurrency(o.vendorEarnings ?? o.subtotal ?? 0)}</span>
                   <span>{timeAgo(o.createdAt)}</span>
                 </div>
               </div>

@@ -56,7 +56,7 @@ export default function PendingProducts() {
       ...p,
       vendorName: p.vendor?.name || p.vendor?.companyName || "Unknown",
       price: p.salesPrice || p.retailPrice || 0,
-      enrichment: (p.enrichmentScore || 0) / 100, // DB stores 0-100, UI expects 0-1
+      enrichment: (() => { const raw = p.enrichmentScore ?? 0; return raw > 1 ? raw / 100 : raw; })(), // DB stores 0-100, UI expects 0-1; guard handles mixed data
       date: p.createdAt || "",
     })),
   [products]);

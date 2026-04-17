@@ -63,7 +63,12 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({ error: "Invalid credentials" });
     }
 
-    // Fetch portalType from VendorAccess (bypass RLS with SET LOCAL)
+    // RLS Bootstrap Read (audit R4 approved)
+    // This is a pre-auth route — no RLS context exists yet.
+    // We temporarily SET LOCAL role to RETAILER_LT within a scoped $transaction
+    // to read VendorAccess.portalType. SET LOCAL ensures the escalation is
+    // automatically rolled back when the transaction ends.
+    // WARNING: Do NOT replicate this pattern outside of pre-auth routes.
     let portalType: string | null = null;
     if (user.role === "VENDOR" && user.vendorId) {
       const vaRows: any[] = await prisma.$transaction(async (tx: any) => {
@@ -73,7 +78,7 @@ export async function authRoutes(app: FastifyInstance) {
           user.id
         );
       });
-      portalType = vaRows[0]?.portalType || null;
+      portalType = vaRows[0]?.portalType ?? null;
     }
 
     // Update last login
@@ -184,7 +189,12 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: "User not found" });
     }
 
-    // Fetch portalType from VendorAccess (bypass RLS with SET LOCAL)
+    // RLS Bootstrap Read (audit R4 approved)
+    // This is a pre-auth route — no RLS context exists yet.
+    // We temporarily SET LOCAL role to RETAILER_LT within a scoped $transaction
+    // to read VendorAccess.portalType. SET LOCAL ensures the escalation is
+    // automatically rolled back when the transaction ends.
+    // WARNING: Do NOT replicate this pattern outside of pre-auth routes.
     let portalType: string | null = null;
     if (user.role === "VENDOR" && user.vendorId) {
       const vaRows: any[] = await prisma.$transaction(async (tx: any) => {
@@ -194,7 +204,7 @@ export async function authRoutes(app: FastifyInstance) {
           user.id
         );
       });
-      portalType = vaRows[0]?.portalType || null;
+      portalType = vaRows[0]?.portalType ?? null;
     }
 
     return {

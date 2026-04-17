@@ -249,9 +249,9 @@ export function createSettlementWorker() {
       concurrency: 5,
       limiter: { max: 20, duration: 1000 },
       // Hardened settings per audit
-      lockDuration: 60_000,         // 60s lock — payment APIs can be very slow
+      lockDuration: 120_000,        // 120s lock — payment APIs can be very slow; 2× P95 per audit R4
       stalledInterval: 30_000,      // Check for stalled jobs every 30s
-      maxStalledCount: 1,           // Strict: mark as stalled after 1 missed heartbeat (payments are critical)
+      maxStalledCount: 2,           // Allow 2 stalls before failing — deploys/OOM can cause false stalls (audit R4)
       metrics: { maxDataPoints: 1000 }, // Enable BullMQ metrics
     }
   );
@@ -261,7 +261,9 @@ export function createSettlementWorker() {
   });
 
   worker.on("failed", (job, err) => {
-    console.error(`[settlement] ❌ Job ${job?.id} failed:`, err.message);
+    console.error(`[settlement] ❌ CRITICAL: Job ${job?.id} failed:`, err.message);
+    // TODO: Wire to PagerDuty/alerting — failed settlement jobs require manual review (audit R4)
+    console.error(`[settlement] 🚨 ALERT: Settlement job ${job?.id} needs manual investigation. Data:`, JSON.stringify(job?.data));
   });
 
   worker.on("stalled", (jobId) => {
