@@ -4,7 +4,7 @@
  * Accept/reject orders, print packing slips, create shipments,
  * upload tracking, and manage order lifecycle.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { formatCurrency, timeAgo } from "@/lib/utils";
@@ -81,6 +81,48 @@ export default function OrderFulfillment() {
   const [carrier, setCarrier] = useState("UPS");
   const [showShipDialog, setShowShipDialog] = useState(false);
   const [noteInput, setNoteInput] = useState("");
+  const [trackingError, setTrackingError] = useState("");
+  const rejectTriggerRef = useRef<HTMLButtonElement>(null);
+  const shipTriggerRef = useRef<HTMLButtonElement>(null);
+  const rejectDialogRef = useRef<HTMLDivElement>(null);
+  const shipDialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap + return focus for dialogs
+  useEffect(() => {
+    if (showRejectDialog && rejectDialogRef.current) {
+      const first = rejectDialogRef.current.querySelector<HTMLElement>("textarea, input, button, [tabindex]");
+      first?.focus();
+    }
+  }, [showRejectDialog]);
+
+  useEffect(() => {
+    if (showShipDialog && shipDialogRef.current) {
+      const first = shipDialogRef.current.querySelector<HTMLElement>("select, input, button, [tabindex]");
+      first?.focus();
+    }
+  }, [showShipDialog]);
+
+  // Close dialogs on Escape
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (showRejectDialog) { setShowRejectDialog(false); rejectTriggerRef.current?.focus(); }
+        if (showShipDialog) { setShowShipDialog(false); shipTriggerRef.current?.focus(); }
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [showRejectDialog, showShipDialog]);
+
+  // Tracking number validation
+  const validateTracking = (val: string) => {
+    setTrackingNumber(val);
+    if (val.trim() && !/^[A-Za-z0-9]{8,40}$/.test(val.trim())) {
+      setTrackingError("Tracking number should be 8-40 alphanumeric characters");
+    } else {
+      setTrackingError("");
+    }
+  };
 
   const handleAccept = async () => {
     setActionLoading("accept");
@@ -166,6 +208,7 @@ export default function OrderFulfillment() {
                 {actionLoading === "accept" ? "Accepting..." : "Accept Order"}
               </button>
               <button
+                ref={rejectTriggerRef}
                 onClick={() => setShowRejectDialog(true)}
                 disabled={actionLoading !== null}
                 className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm hover:bg-red-100 transition-colors disabled:opacity-50"
@@ -187,6 +230,7 @@ export default function OrderFulfillment() {
           )}
           {(order.status === "accepted" || order.status === "processing") && (
             <button
+              ref={shipTriggerRef}
               onClick={() => setShowShipDialog(true)}
               disabled={actionLoading !== null}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors disabled:opacity-50"
@@ -361,9 +405,9 @@ export default function OrderFulfillment() {
 
       {/* Reject Dialog */}
       {showRejectDialog && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-elevated w-full max-w-md p-6">
-            <h3 className="font-heading text-lg text-gray-900 mb-4">Reject Order</h3>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => { setShowRejectDialog(false); rejectTriggerRef.current?.focus(); }}>
+          <div ref={rejectDialogRef} role="dialog" aria-modal="true" aria-labelledby="reject-dialog-title" className="bg-white rounded-xl shadow-elevated w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 id="reject-dialog-title" className="font-heading text-lg text-gray-900 mb-4">Reject Order</h3>
             <p className="text-sm text-gray-600 mb-4">Please provide a reason for rejecting this order. The retailer will be notified.</p>
             <textarea
               value={rejectReason}
@@ -373,7 +417,7 @@ export default function OrderFulfillment() {
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900 resize-none mb-4"
             />
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowRejectDialog(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={() => { setShowRejectDialog(false); rejectTriggerRef.current?.focus(); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
               <button
                 onClick={handleReject}
                 disabled={!rejectReason.trim() || actionLoading === "reject"}
@@ -388,9 +432,9 @@ export default function OrderFulfillment() {
 
       {/* Ship Dialog */}
       {showShipDialog && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-elevated w-full max-w-md p-6">
-            <h3 className="font-heading text-lg text-gray-900 mb-4">Ship Order</h3>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => { setShowShipDialog(false); shipTriggerRef.current?.focus(); }}>
+          <div ref={shipDialogRef} role="dialog" aria-modal="true" aria-labelledby="ship-dialog-title" className="bg-white rounded-xl shadow-elevated w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 id="ship-dialog-title" className="font-heading text-lg text-gray-900 mb-4">Ship Order</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Carrier</label>
@@ -410,17 +454,18 @@ export default function OrderFulfillment() {
                 <input
                   type="text"
                   value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value)}
+                  onChange={(e) => validateTracking(e.target.value)}
                   placeholder="e.g., 1Z999AA10123456784"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+                  className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900 ${trackingError ? "border-red-300" : "border-gray-300"}`}
                 />
+                {trackingError && <p className="text-xs text-red-600 mt-1">{trackingError}</p>}
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <button onClick={() => setShowShipDialog(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={() => { setShowShipDialog(false); shipTriggerRef.current?.focus(); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
               <button
                 onClick={handleShip}
-                disabled={!trackingNumber.trim() || actionLoading === "ship"}
+                disabled={!trackingNumber.trim() || !!trackingError || actionLoading === "ship"}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 {actionLoading === "ship" ? "Shipping..." : "Confirm Shipment"}

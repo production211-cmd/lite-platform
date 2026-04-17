@@ -4,7 +4,15 @@
  * Business info, payment settings, notification preferences,
  * shipping defaults, and API keys.
  */
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+// Simple toast helper (no external dependency)
+const showToast = (msg: string) => {
+  const el = document.createElement("div");
+  el.textContent = msg;
+  el.className = "fixed bottom-6 right-6 z-50 bg-gray-900 text-white px-5 py-3 rounded-lg shadow-lg text-sm animate-fade-in";
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity 0.3s"; setTimeout(() => el.remove(), 300); }, 3000);
+};
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Building2, CreditCard, Bell, Truck, Key, Save,
@@ -28,6 +36,15 @@ export default function VendorSettings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const initialState = useRef<string>("");
+
+  // Simulate fetching API key from server
+  useEffect(() => {
+    const timer = setTimeout(() => setApiKey("sk_live_LT_••••••••••••••••••••"), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const [business, setBusiness] = useState({
     name: user?.vendorName || "Urban Threads",
@@ -72,11 +89,30 @@ export default function VendorSettings() {
     signatureRequired: "over500",
   });
 
+  // Track unsaved changes (must be after state declarations)
+  useEffect(() => {
+    const current = JSON.stringify({ business, payment, notifications, shipping });
+    if (!initialState.current) initialState.current = current;
+    setIsDirty(current !== initialState.current);
+  }, [business, payment, notifications, shipping]);
+
+  // Warn on navigation away with unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty) { e.preventDefault(); e.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
   const handleSave = async () => {
     setSaving(true);
     await new Promise((r) => setTimeout(r, 1000));
     setSaving(false);
     setSaved(true);
+    setIsDirty(false);
+    initialState.current = JSON.stringify({ business, payment, notifications, shipping });
+    showToast("Settings saved successfully");
     setTimeout(() => setSaved(false), 3000);
   };
 
@@ -93,7 +129,7 @@ export default function VendorSettings() {
           className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50"
         >
           {saved ? <Check size={16} /> : <Save size={16} />}
-          {saving ? "Saving..." : saved ? "Saved" : "Save Changes"}
+          {saving ? "Saving..." : saved ? "Saved" : isDirty ? "Save Changes *" : "Save Changes"}
         </button>
       </div>
 
@@ -197,7 +233,7 @@ export default function VendorSettings() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Payout ($)</label>
-                  <input type="number" value={payment.minimumPayout} onChange={(e) => setPayment({ ...payment, minimumPayout: e.target.value })} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900" />
+                  <input type="number" min="0" max="10000" step="1" value={payment.minimumPayout} onChange={(e) => setPayment({ ...payment, minimumPayout: e.target.value })} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900" />
                 </div>
               </div>
               <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
@@ -246,11 +282,11 @@ export default function VendorSettings() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Handling Time (days)</label>
-                  <input type="number" value={shipping.handlingTime} onChange={(e) => setShipping({ ...shipping, handlingTime: e.target.value })} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900" />
+                  <input type="number" min="0" max="30" step="1" value={shipping.handlingTime} onChange={(e) => setShipping({ ...shipping, handlingTime: e.target.value })} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Free Shipping Threshold ($)</label>
-                  <input type="number" value={shipping.freeShippingThreshold} onChange={(e) => setShipping({ ...shipping, freeShippingThreshold: e.target.value })} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900" />
+                  <input type="number" min="0" max="99999" step="1" value={shipping.freeShippingThreshold} onChange={(e) => setShipping({ ...shipping, freeShippingThreshold: e.target.value })} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Signature Required</label>
@@ -273,7 +309,7 @@ export default function VendorSettings() {
                 <div className="flex items-center gap-2">
                   <input
                     type={showApiKey ? "text" : "password"}
-                    value="sk_live_LT_vendor_a1b2c3d4e5f6g7h8i9j0"
+                    value={apiKey ? (showApiKey ? apiKey : "sk_live_••••••••••••••••••••") : "Loading..."}
                     readOnly
                     className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-mono bg-white"
                   />

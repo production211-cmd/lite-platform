@@ -4,7 +4,7 @@
  * Manages notification list, unread count, mark-as-read,
  * and toast triggers for real-time alerts.
  */
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
 
 export type NotificationType = "order" | "shipment" | "return" | "vendor" | "product" | "finance" | "system" | "alert";
 export type NotificationPriority = "low" | "medium" | "high" | "critical";
@@ -99,7 +99,7 @@ const DEMO_NOTIFICATIONS: Notification[] = [
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>(DEMO_NOTIFICATIONS);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
   const markAsRead = useCallback((id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
@@ -127,8 +127,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setNotifications([]);
   }, []);
 
+  const value = useMemo(() => ({
+    notifications, unreadCount, markAsRead, markAllAsRead, dismissNotification, addNotification, clearAll,
+  }), [notifications, unreadCount, markAsRead, markAllAsRead, dismissNotification, addNotification, clearAll]);
+
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, dismissNotification, addNotification, clearAll }}>
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );

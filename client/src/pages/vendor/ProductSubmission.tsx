@@ -391,27 +391,37 @@ export default function ProductSubmission() {
             )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {form.images.map((img) => (
-                <div key={img.id} className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square">
-                  <img src={img.url} alt={img.alt} className="w-full h-full object-cover" />
-                  {img.isPrimary && (
-                    <span className="absolute top-2 left-2 px-2 py-0.5 bg-gray-900 text-white text-[10px] rounded-full uppercase tracking-wider">Primary</span>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    {!img.isPrimary && (
-                      <button
-                        onClick={() => setPrimaryImage(img.id)}
-                        className="px-3 py-1.5 bg-white rounded-lg text-xs font-medium hover:bg-gray-100 transition-colors"
-                      >
-                        Set Primary
-                      </button>
+                <div key={img.id} className="space-y-1">
+                  <div className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square">
+                    <img src={img.url} alt={img.alt || "Product image"} className="w-full h-full object-cover" />
+                    {img.isPrimary && (
+                      <span className="absolute top-2 left-2 px-2 py-0.5 bg-gray-900 text-white text-[10px] rounded-full uppercase tracking-wider">Primary</span>
                     )}
-                    <button
-                      onClick={() => removeImage(img.id)}
-                      className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      {!img.isPrimary && (
+                        <button
+                          onClick={() => setPrimaryImage(img.id)}
+                          className="px-3 py-1.5 bg-white rounded-lg text-xs font-medium hover:bg-gray-100 transition-colors"
+                        >
+                          Set Primary
+                        </button>
+                      )}
+                      <button
+                        onClick={() => removeImage(img.id)}
+                        className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
+                  <input
+                    type="text"
+                    value={img.alt}
+                    onChange={(e) => updateField("images", form.images.map((i) => i.id === img.id ? { ...i, alt: e.target.value } : i))}
+                    placeholder="Alt text"
+                    className="w-full px-2 py-1 border border-gray-200 rounded text-xs text-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                    aria-label={`Alt text for image ${img.alt || img.id}`}
+                  />
                 </div>
               ))}
               <button
@@ -481,16 +491,16 @@ export default function ProductSubmission() {
                         <input type="text" value={v.upc} onChange={(e) => updateVariant(v.id, "upc", e.target.value)} placeholder="012345678901" className="w-28 px-2 py-1.5 border border-gray-300 rounded text-sm" />
                       </td>
                       <td className="py-2 px-2">
-                        <input type="number" value={v.price} onChange={(e) => updateVariant(v.id, "price", e.target.value)} placeholder="0.00" className="w-20 px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                        <input type="number" min="0" max="99999" step="0.01" value={v.price} onChange={(e) => updateVariant(v.id, "price", e.target.value)} placeholder="0.00" className="w-20 px-2 py-1.5 border border-gray-300 rounded text-sm" />
                       </td>
                       <td className="py-2 px-2">
-                        <input type="number" value={v.compareAt} onChange={(e) => updateVariant(v.id, "compareAt", e.target.value)} placeholder="0.00" className="w-20 px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                        <input type="number" min="0" max="99999" step="0.01" value={v.compareAt} onChange={(e) => updateVariant(v.id, "compareAt", e.target.value)} placeholder="0.00" className="w-20 px-2 py-1.5 border border-gray-300 rounded text-sm" />
                       </td>
                       <td className="py-2 px-2">
-                        <input type="number" value={v.inventory} onChange={(e) => updateVariant(v.id, "inventory", e.target.value)} placeholder="0" className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                        <input type="number" min="0" max="999999" step="1" value={v.inventory} onChange={(e) => updateVariant(v.id, "inventory", e.target.value)} placeholder="0" className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm" />
                       </td>
                       <td className="py-2 px-2">
-                        <input type="number" value={v.weight} onChange={(e) => updateVariant(v.id, "weight", e.target.value)} placeholder="0" className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                        <input type="number" min="0" max="9999" step="0.1" value={v.weight} onChange={(e) => updateVariant(v.id, "weight", e.target.value)} placeholder="0" className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm" />
                       </td>
                       <td className="py-2 px-2">
                         <button
@@ -518,6 +528,9 @@ export default function ProductSubmission() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Weight (oz) *</label>
                 <input
                   type="number"
+                  min="0"
+                  max="9999"
+                  step="0.1"
                   value={form.shippingWeight}
                   onChange={(e) => updateField("shippingWeight", e.target.value)}
                   placeholder="e.g., 12"
@@ -656,7 +669,11 @@ export default function ProductSubmission() {
             disabled={submitting}
             className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors disabled:opacity-50"
           >
-            <Send size={16} />
+            {submitting ? (
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+            ) : (
+              <Send size={16} />
+            )}
             {submitting ? "Submitting..." : "Submit for Review"}
           </button>
         )}

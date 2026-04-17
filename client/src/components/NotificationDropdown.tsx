@@ -4,7 +4,7 @@
  * Renders in TopBar. Shows unread count badge, dropdown list
  * with priority indicators, mark-as-read, and link to full center.
  */
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useNotifications, type Notification, type NotificationType } from "@/contexts/NotificationContext";
 import { Link } from "wouter";
 import {
@@ -76,7 +76,16 @@ export default function NotificationDropdown() {
     return () => document.removeEventListener("keydown", handleKey);
   }, [open]);
 
-  const recent = notifications.slice(0, 8);
+  const recent = useMemo(() => notifications.slice(0, 8), [notifications]);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Move focus into dropdown when opened
+  useEffect(() => {
+    if (open && dropdownRef.current) {
+      const first = dropdownRef.current.querySelector<HTMLElement>("button, a, [tabindex]");
+      first?.focus();
+    }
+  }, [open]);
 
   return (
     <div ref={ref} className="relative">
@@ -99,8 +108,10 @@ export default function NotificationDropdown() {
       {/* Dropdown */}
       {open && (
         <div
+          ref={dropdownRef}
           role="dialog"
           aria-label="Notifications"
+          aria-modal="true"
           className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl border border-gray-200 shadow-elevated z-50 overflow-hidden"
           style={{ animation: "fadeInUp 0.2s ease-out" }}
         >
@@ -131,11 +142,13 @@ export default function NotificationDropdown() {
               recent.map((n) => {
                 const Icon = TYPE_ICONS[n.type];
                 return (
-                  <div
+                  <button
                     key={n.id}
-                    className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer group ${
+                    type="button"
+                    className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer group w-full text-left ${
                       !n.read ? "bg-blue-50/30" : ""
                     }`}
+                    aria-label={`${n.title}. ${n.read ? "Read" : "Unread"}. ${timeAgo(n.timestamp)}`}
                     onClick={() => {
                       markAsRead(n.id);
                       if (n.actionUrl) {
@@ -192,7 +205,7 @@ export default function NotificationDropdown() {
                         <X size={12} />
                       </button>
                     </div>
-                  </div>
+                  </button>
                 );
               })
             )}

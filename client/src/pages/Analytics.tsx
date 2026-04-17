@@ -5,7 +5,7 @@
  * scorecards, shipping SLA compliance, and exportable report views.
  * Uses inline SVG charts for zero-dependency rendering.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useId } from "react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, Users,
@@ -95,7 +95,7 @@ const SHIPPING_SLA = {
 
 // SVG Area Chart
 function AreaChart({ data, height = 200, color = "#3b82f6" }: { data: { label: string; value: number }[]; height?: number; color?: string }) {
-  const width = 600;
+  const width = 800;
   const padding = { top: 20, right: 20, bottom: 30, left: 60 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
@@ -206,11 +206,15 @@ export default function Analytics() {
   const [period, setPeriod] = useState<Period>("30d");
   const [activeTab, setActiveTab] = useState<"overview" | "vendors" | "shipping">("overview");
 
-  const revenueData = REVENUE_DATA[period];
-  const totalRevenue = revenueData.reduce((s, d) => s + d.value, 0);
-  const totalOrders = revenueData.reduce((s, d) => s + d.orders, 0);
-  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-  const conversionRate = ((FUNNEL[4].value / FUNNEL[0].value) * 100).toFixed(2);
+  const tabId = useId();
+
+  const revenueData = useMemo(() => REVENUE_DATA[period], [period]);
+  const { totalRevenue, totalOrders, avgOrderValue } = useMemo(() => {
+    const rev = revenueData.reduce((s, d) => s + d.value, 0);
+    const ord = revenueData.reduce((s, d) => s + d.orders, 0);
+    return { totalRevenue: rev, totalOrders: ord, avgOrderValue: ord > 0 ? rev / ord : 0 };
+  }, [revenueData]);
+  const conversionRate = useMemo(() => ((FUNNEL[4].value / FUNNEL[0].value) * 100).toFixed(2), []);
 
   return (
     <div className="page-enter p-6 lg:p-8 max-w-7xl mx-auto">
@@ -242,7 +246,7 @@ export default function Analytics() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div role="tablist" aria-label="Analytics sections" className="flex gap-1 mb-6 border-b border-gray-200">
         {[
           { id: "overview" as const, label: "Overview", icon: BarChart3 },
           { id: "vendors" as const, label: "Vendor Performance", icon: Users },
@@ -252,6 +256,10 @@ export default function Analytics() {
           return (
             <button
               key={tab.id}
+              role="tab"
+              id={`${tabId}-tab-${tab.id}`}
+              aria-selected={activeTab === tab.id}
+              aria-controls={`${tabId}-panel-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === tab.id
@@ -268,6 +276,7 @@ export default function Analytics() {
 
       {/* Overview Tab */}
       {activeTab === "overview" && (
+        <div role="tabpanel" id={`${tabId}-panel-overview`} aria-labelledby={`${tabId}-tab-overview`}>
         <div className="space-y-6">
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -352,11 +361,12 @@ export default function Analytics() {
             </div>
           </div>
         </div>
+        </div>
       )}
 
       {/* Vendor Performance Tab */}
       {activeTab === "vendors" && (
-        <div className="space-y-6">
+        <div role="tabpanel" id={`${tabId}-panel-vendors`} aria-labelledby={`${tabId}-tab-vendors`} className="space-y-6">
           {/* Vendor Scorecards */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-soft overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100">
@@ -435,6 +445,7 @@ export default function Analytics() {
 
       {/* Shipping SLA Tab */}
       {activeTab === "shipping" && (
+        <div role="tabpanel" id={`${tabId}-panel-shipping`} aria-labelledby={`${tabId}-tab-shipping`}>
         <div className="space-y-6">
           {/* SLA Overview */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -532,6 +543,7 @@ export default function Analytics() {
               ))}
             </div>
           </div>
+        </div>
         </div>
       )}
     </div>

@@ -4,7 +4,7 @@
  * Detailed payout history with period selector, earnings breakdown,
  * upcoming payout preview, and downloadable statements.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui-components";
@@ -180,9 +180,8 @@ export default function PayoutHistory() {
             </thead>
             <tbody>
               {paginated.map((p) => (
-                <>
+                <Fragment key={p.id}>
                   <tr
-                    key={p.id}
                     className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
                     onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
                   >
@@ -199,7 +198,7 @@ export default function PayoutHistory() {
                     </td>
                   </tr>
                   {expandedId === p.id && (
-                    <tr key={`${p.id}-detail`}>
+                    <tr>
                       <td colSpan={9} className="bg-gray-50 px-8 py-4">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div>
@@ -228,7 +227,7 @@ export default function PayoutHistory() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

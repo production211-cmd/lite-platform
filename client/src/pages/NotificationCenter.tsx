@@ -53,6 +53,7 @@ export default function NotificationCenter() {
   const [readFilter, setReadFilter] = useState<"all" | "unread" | "read">("all");
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [statusMessage, setStatusMessage] = useState("");
   const perPage = 15;
 
   const filtered = useMemo(() => {
@@ -88,13 +89,19 @@ export default function NotificationCenter() {
   };
 
   const bulkMarkRead = () => {
+    const count = selectedIds.size;
     selectedIds.forEach((id) => markAsRead(id));
     setSelectedIds(new Set());
+    setStatusMessage(`${count} notification${count > 1 ? "s" : ""} marked as read`);
+    setTimeout(() => setStatusMessage(""), 3000);
   };
 
   const bulkDismiss = () => {
+    const count = selectedIds.size;
     selectedIds.forEach((id) => dismissNotification(id));
     setSelectedIds(new Set());
+    setStatusMessage(`${count} notification${count > 1 ? "s" : ""} dismissed`);
+    setTimeout(() => setStatusMessage(""), 3000);
   };
 
   const types: NotificationType[] = ["order", "shipment", "return", "vendor", "product", "finance", "system", "alert"];
@@ -140,7 +147,7 @@ export default function NotificationCenter() {
           {/* Type Filter */}
           <select
             value={typeFilter}
-            onChange={(e) => { setTypeFilter(e.target.value as any); setPage(1); }}
+            onChange={(e) => { setTypeFilter(e.target.value as NotificationType | "all"); setPage(1); }}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
           >
             <option value="all">All Types</option>
@@ -152,7 +159,7 @@ export default function NotificationCenter() {
           {/* Priority Filter */}
           <select
             value={priorityFilter}
-            onChange={(e) => { setPriorityFilter(e.target.value as any); setPage(1); }}
+            onChange={(e) => { setPriorityFilter(e.target.value as NotificationPriority | "all"); setPage(1); }}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
           >
             <option value="all">All Priorities</option>
@@ -165,7 +172,7 @@ export default function NotificationCenter() {
           {/* Read Filter */}
           <select
             value={readFilter}
-            onChange={(e) => { setReadFilter(e.target.value as any); setPage(1); }}
+            onChange={(e) => { setReadFilter(e.target.value as "all" | "unread" | "read"); setPage(1); }}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
           >
             <option value="all">All</option>
@@ -174,6 +181,9 @@ export default function NotificationCenter() {
           </select>
         </div>
       </div>
+
+      {/* Screen reader announcement for bulk actions */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">{statusMessage}</div>
 
       {/* Bulk Actions */}
       {selectedIds.size > 0 && (
