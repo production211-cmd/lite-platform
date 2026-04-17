@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { api } from "@/lib/api";
 import { formatCurrency, cn } from "@/lib/utils";
+import { Link } from "wouter";
 import {
   Search, Eye, Grid3X3, List, Plus, Package,
   ChevronLeft, ChevronRight, Image as ImageIcon, Star,
@@ -217,7 +218,7 @@ export default function Products() {
                     </div>
                   </td>
                   <td><span className={`status-badge ${statusColor(product.status)}`}>{product.status?.replace(/_/g, " ")}</span></td>
-                  <td><button className="btn-view"><Eye size={12} /> View</button></td>
+                  <td><Link href={`/products/${product.id}`} className="btn-view"><Eye size={12} /> View</Link></td>
                 </tr>
               ))}
               {paginated.length === 0 && (

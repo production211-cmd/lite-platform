@@ -15,12 +15,15 @@ import Vendors from "@/pages/Vendors";
 import VendorDetail from "@/pages/VendorDetail";
 import VendorOnboarding from "@/pages/VendorOnboarding";
 import Products from "@/pages/Products";
+import ProductDetail from "@/pages/ProductDetail";
 import Orders from "@/pages/Orders";
 import OrderDetail from "@/pages/OrderDetail";
 import Shipping from "@/pages/Shipping";
+import ShipmentDetail from "@/pages/ShipmentDetail";
 import Messages from "@/pages/Messages";
 import Finance from "@/pages/Finance";
 import Returns from "@/pages/Returns";
+import ReturnDetail from "@/pages/ReturnDetail";
 import PendingOrders from "@/pages/PendingOrders";
 import OrderAnalytics from "@/pages/OrderAnalytics";
 import PendingProducts from "@/pages/PendingProducts";
@@ -30,6 +33,7 @@ import VendorBalances from "@/pages/VendorBalances";
 import Settings from "@/pages/Settings";
 import QueueMonitor from "@/pages/QueueMonitor";
 import Issues from "@/pages/Issues";
+import ActivityLog from "@/pages/ActivityLog";
 import {
   Ads, Marketing,
   ProductPricing, ProductEnrichment,
@@ -61,10 +65,12 @@ function AdminContent() {
             <Route path="/products/pending" component={PendingProducts} />
             <Route path="/products/pricing" component={ProductPricing} />
             <Route path="/products/enrichment" component={ProductEnrichment} />
+            <Route path="/products/:id" component={ProductDetail} />
             {/* Orders */}
             <Route path="/orders" component={Orders} />
             <Route path="/orders/pending" component={PendingOrders} />
             <Route path="/orders/returns" component={Returns} />
+            <Route path="/orders/returns/:id" component={ReturnDetail} />
             <Route path="/orders/issues" component={Issues} />
             <Route path="/orders/analytics" component={OrderAnalytics} />
             <Route path="/orders/:id" component={OrderDetail} />
@@ -72,6 +78,7 @@ function AdminContent() {
             <Route path="/shipping" component={Shipping} />
             <Route path="/shipping/costs" component={ShippingCosts} />
             <Route path="/shipping/settings" component={ShippingSettings} />
+            <Route path="/shipping/:id" component={ShipmentDetail} />
             {/* Messages */}
             <Route path="/messages" component={Messages} />
             {/* Finance */}
@@ -82,6 +89,8 @@ function AdminContent() {
             {/* Ads & Marketing */}
             <Route path="/ads" component={Ads} />
             <Route path="/marketing" component={Marketing} />
+            {/* Activity Log */}
+            <Route path="/activity" component={ActivityLog} />
             {/* Settings & Admin */}
             <Route path="/settings" component={Settings} />
             <Route path="/admin/queues" component={QueueMonitor} />

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
+import { Link } from "wouter";
 import { Search, Eye, Truck, Package, Clock, CheckCircle, AlertTriangle } from "lucide-react";
 
 const STATUS_TABS = [
@@ -216,10 +217,10 @@ export default function Shipping() {
                   </td>
                   <td className="text-xs text-gray-500 font-body">{formatDate(s.createdAt)}</td>
                   <td>
-                    <button className="btn-view">
+                    <Link href={`/shipping/${s.id}`} className="btn-view">
                       <Eye size={12} />
                       View
-                    </button>
+                    </Link>
                   </td>
                 </tr>
               ))}
