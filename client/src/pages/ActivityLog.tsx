@@ -128,7 +128,7 @@ export default function ActivityLog() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold font-heading">Activity Log</h1>
+            <h1 className="text-xl font-heading small-caps">Activity Log</h1>
             {unreadCount > 0 && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
                 {unreadCount} alerts
@@ -192,16 +192,21 @@ export default function ActivityLog() {
             <button
               key={sev}
               onClick={() => setSeverityFilter(severityFilter === sev ? null : sev)}
+              aria-label={`Filter by ${sev} severity`}
               className={cn(
-                "w-2.5 h-2.5 rounded-full border-2 transition-all",
-                severityFilter === sev ? "scale-150" : "",
-                sev === "error" ? "bg-red-500 border-red-500" :
-                sev === "warning" ? "bg-amber-500 border-amber-500" :
-                sev === "success" ? "bg-green-500 border-green-500" :
-                "bg-blue-400 border-blue-400"
+                "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                severityFilter === sev ? "ring-2 ring-offset-1 ring-gray-400" : "hover:bg-gray-50"
               )}
               title={sev}
-            />
+            >
+              <span className={cn(
+                "w-2.5 h-2.5 rounded-full block",
+                sev === "error" ? "bg-red-500" :
+                sev === "warning" ? "bg-amber-500" :
+                sev === "success" ? "bg-green-500" :
+                "bg-blue-400"
+              )} />
+            </button>
           ))}
         </div>
       </div>

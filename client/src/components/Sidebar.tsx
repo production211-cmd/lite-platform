@@ -7,7 +7,7 @@ import {
   DollarSign, ChevronRight, ChevronDown, LogOut, User,
   Package, BarChart3, AlertTriangle, RotateCcw,
   Megaphone, CalendarDays, Settings, MessageSquare,
-  ChevronLeft, Activity, UserPlus, Bell,
+  ChevronLeft, Activity, UserPlus, Bell, Menu, X,
 } from "lucide-react";
 
 interface NavChild {
@@ -87,6 +87,12 @@ export function Sidebar() {
   const { collapsed, toggle } = useSidebar();
   const { logout } = useAuth();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location]);
 
   // Auto-expand the parent nav item based on current location
   useEffect(() => {
@@ -121,13 +127,34 @@ export function Sidebar() {
   };
 
   return (
-    <aside
-      className="fixed left-0 top-0 h-screen flex flex-col z-50 transition-all duration-300 text-white"
-      style={{
-        width: collapsed ? "var(--sidebar-collapsed-width)" : "var(--sidebar-width)",
-        backgroundColor: "var(--sidebar-bg)",
-      }}
-    >
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        className="fixed top-3 left-3 z-[60] md:hidden bg-[var(--sidebar-bg)] text-white p-2 rounded-lg shadow-lg"
+        onClick={() => setMobileOpen(!mobileOpen)}
+        aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'}
+      >
+        {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="sidebar-overlay md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`fixed left-0 top-0 h-screen flex flex-col z-50 transition-all duration-300 text-white ${
+          mobileOpen ? 'sidebar-mobile-visible' : 'max-md:sidebar-mobile-hidden'
+        }`}
+        style={{
+          width: collapsed ? "var(--sidebar-collapsed-width)" : "var(--sidebar-width)",
+          backgroundColor: "var(--sidebar-bg)",
+        }}
+      >
       {/* Logo */}
       <div className="flex flex-col items-center py-5 px-4">
         {!collapsed ? (
@@ -163,23 +190,7 @@ export function Sidebar() {
               {hasChildren ? (
                 <button
                   onClick={() => toggleExpanded(item.label)}
-                  className={`w-full px-5 py-2.5 text-left flex items-center justify-between text-[0.8125rem] font-body relative sidebar-nav-item ${active ? 'active' : ''}`}
-                  style={{
-                    backgroundColor: active ? "var(--sidebar-active)" : "transparent",
-                    color: active ? "#ffffff" : "#9ca3af",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)";
-                      e.currentTarget.style.color = "#ffffff";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                      e.currentTarget.style.color = "#9ca3af";
-                    }
-                  }}
+                  className={`w-full px-5 py-2.5 text-left flex items-center justify-between text-[0.8125rem] font-body relative sidebar-nav-item ${active ? 'active text-white bg-[var(--sidebar-active)]' : 'text-gray-400 bg-transparent hover:text-white'}`}
                 >
                   <span className="flex items-center gap-3">
                     <Icon size={18} strokeWidth={1.75} />
@@ -192,23 +203,7 @@ export function Sidebar() {
               ) : (
                 <Link
                   href={item.href}
-                  className={`w-full px-5 py-2.5 flex items-center gap-3 text-[0.8125rem] font-body relative sidebar-nav-item ${active ? 'active' : ''}`}
-                  style={{
-                    backgroundColor: active ? "var(--sidebar-active)" : "transparent",
-                    color: active ? "#ffffff" : "#9ca3af",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)";
-                      e.currentTarget.style.color = "#ffffff";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                      e.currentTarget.style.color = "#9ca3af";
-                    }
-                  }}
+                  className={`w-full px-5 py-2.5 flex items-center gap-3 text-[0.8125rem] font-body relative sidebar-nav-item ${active ? 'active text-white bg-[var(--sidebar-active)]' : 'text-gray-400 bg-transparent hover:text-white'}`}
                 >
                   <Icon size={18} strokeWidth={1.75} />
                   {!collapsed && (
@@ -231,23 +226,7 @@ export function Sidebar() {
                       <Link
                         key={child.href}
                         href={child.href}
-                        className={`block px-5 py-2 pl-12 text-[0.8125rem] font-body sidebar-nav-item ${childActive ? 'active' : ''}`}
-                        style={{
-                          color: childActive ? "#ffffff" : "#6b7280",
-                          backgroundColor: childActive ? "var(--sidebar-active)" : "transparent",
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!childActive) {
-                            e.currentTarget.style.color = "#ffffff";
-                            e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)";
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!childActive) {
-                            e.currentTarget.style.color = "#6b7280";
-                            e.currentTarget.style.backgroundColor = "transparent";
-                          }
-                        }}
+                        className={`block px-5 py-2 pl-12 text-[0.8125rem] font-body sidebar-nav-item ${childActive ? 'active text-white bg-[var(--sidebar-active)]' : 'text-gray-500 bg-transparent hover:text-white'}`}
                       >
                         {child.label}
                       </Link>
@@ -287,5 +266,6 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }
