@@ -16,6 +16,10 @@ import VendorProducts from "@/pages/vendor/VendorProducts";
 import VendorOrders from "@/pages/vendor/VendorOrders";
 import VendorShipments from "@/pages/vendor/VendorShipments";
 import VendorFinance from "@/pages/vendor/VendorFinance";
+import ProductSubmission from "@/pages/vendor/ProductSubmission";
+import OrderFulfillment from "@/pages/vendor/OrderFulfillment";
+import PayoutHistory from "@/pages/vendor/PayoutHistory";
+import VendorSettings from "@/pages/vendor/VendorSettings";
 import {
   House, Package, ShoppingCart, Truck, DollarSign,
   MessageSquare, Settings, ChevronRight, ChevronDown,
@@ -255,19 +259,20 @@ function VendorContent() {
           <Switch>
             <Route path="/vendor" component={VendorDashboard} />
             <Route path="/vendor/products" component={VendorProducts} />
-            <Route path="/vendor/products/new">{() => <VendorPlaceholder title="Add Product" />}</Route>
+            <Route path="/vendor/products/new" component={ProductSubmission} />
             <Route path="/vendor/orders" component={VendorOrders} />
             <Route path="/vendor/orders/pending">{() => {
               // Filter to pending only via VendorOrders with preset filter
               return <VendorOrders />;
             }}</Route>
             <Route path="/vendor/orders/returns">{() => <VendorPlaceholder title="Returns" />}</Route>
+            <Route path="/vendor/orders/:id" component={OrderFulfillment} />
             <Route path="/vendor/shipments" component={VendorShipments} />
             <Route path="/vendor/messages">{() => <VendorPlaceholder title="Messages" />}</Route>
             <Route path="/vendor/finance" component={VendorFinance} />
-            <Route path="/vendor/finance/payouts" component={VendorFinance} />
+            <Route path="/vendor/finance/payouts" component={PayoutHistory} />
             <Route path="/vendor/analytics">{() => <VendorPlaceholder title="Analytics" />}</Route>
-            <Route path="/vendor/settings">{() => <VendorPlaceholder title="Settings" />}</Route>
+            <Route path="/vendor/settings" component={VendorSettings} />
             <Route>
               <div className="flex items-center justify-center h-[60vh]">
                 <p className="text-gray-500">Page not found</p>

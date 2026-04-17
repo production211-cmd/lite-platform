@@ -34,6 +34,8 @@ import Settings from "@/pages/Settings";
 import QueueMonitor from "@/pages/QueueMonitor";
 import Issues from "@/pages/Issues";
 import ActivityLog from "@/pages/ActivityLog";
+import Analytics from "@/pages/Analytics";
+import NotificationCenter from "@/pages/NotificationCenter";
 import {
   Ads, Marketing,
   ProductPricing, ProductEnrichment,
@@ -89,8 +91,11 @@ function AdminContent() {
             {/* Ads & Marketing */}
             <Route path="/ads" component={Ads} />
             <Route path="/marketing" component={Marketing} />
-            {/* Activity Log */}
+            {/* Activity Log & Notifications */}
             <Route path="/activity" component={ActivityLog} />
+            <Route path="/notifications" component={NotificationCenter} />
+            {/* Analytics */}
+            <Route path="/analytics" component={Analytics} />
             {/* Settings & Admin */}
             <Route path="/settings" component={Settings} />
             <Route path="/admin/queues" component={QueueMonitor} />

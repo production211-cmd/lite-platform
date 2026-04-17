@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Bell, User, LogOut } from "lucide-react";
+import { Search, User, LogOut } from "lucide-react";
+import NotificationDropdown from "@/components/NotificationDropdown";
 
 interface TopBarProps {
   title?: string;
@@ -34,9 +35,7 @@ export function TopBar({ title = "Marketplace", subtitle = "Marketplace Manageme
         </button>
 
         {/* Notifications */}
-        <button className="relative text-gray-400 hover:text-gray-600 transition-colors">
-          <Bell size={20} />
-        </button>
+        <NotificationDropdown />
 
         {/* User */}
         <div className="flex items-center gap-3 ml-2">

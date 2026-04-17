@@ -7,6 +7,7 @@
 import React from "react";
 import { Route, Switch, useLocation, Redirect } from "wouter";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AdminShell } from "@/layouts/AdminShell";
 import { VendorShell } from "@/layouts/VendorShell";
 import { VendorPortalShell } from "@/layouts/VendorPortalShell";
@@ -103,7 +104,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppRouter />
+        <NotificationProvider>
+          <AppRouter />
+        </NotificationProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

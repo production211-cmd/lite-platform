@@ -77,6 +77,7 @@ const retailerNav: NavItem[] = [
   },
   { label: "Ads", href: "/ads", icon: Megaphone },
   { label: "Marketing / Events", href: "/marketing", icon: CalendarDays },
+  { label: "Analytics & Reports", href: "/analytics", icon: BarChart3 },
   { label: "Activity Log", href: "/activity", icon: Bell },
   { label: "Settings", href: "/settings", icon: Settings },
   { label: "Queue Monitor", href: "/admin/queues", icon: Activity }
