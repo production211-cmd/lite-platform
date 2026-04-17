@@ -292,21 +292,39 @@ async function main() {
 
   console.log(`✅ ${vendors.length} vendors created`);
 
-  // Create vendor users
+  // Create vendor users with VendorAccess
+  // Portal-only vendors (PORTAL type): Link2Lux, Luxclusif, BRG Dresscode
+  const portalOnlyVendors = new Set(["link2lux", "luxclusif", "brg-dresscode"]);
+
   for (const vendor of vendors) {
-    await prisma.user.create({
+    const isPortalOnly = portalOnlyVendors.has(vendor.slug);
+    const user = await prisma.user.create({
       data: {
         email: `vendor@${vendor.slug}.com`,
         passwordHash: vendorPassword,
         firstName: vendor.name,
         lastName: "Admin",
-        role: "VENDOR_USER",
+        role: isPortalOnly ? "VENDOR" : "VENDOR_USER",
         vendorId: vendor.id,
+      },
+    });
+
+    // Create VendorAccess record
+    await prisma.vendorAccess.create({
+      data: {
+        userId: user.id,
+        vendorId: vendor.id,
+        portalType: isPortalOnly ? "PORTAL" : "FULL",
+        shipFromAddress: {
+          street: `${vendor.name} Warehouse`,
+          city: vendor.city || "Unknown",
+          country: vendor.country,
+        },
       },
     });
   }
 
-  console.log("✅ Vendor users created");
+  console.log("✅ Vendor users and access records created");
 
   // ============================================================
   // PRODUCTS (sample products per vendor)
@@ -324,8 +342,7 @@ async function main() {
   ];
 
   const productTypes = [
-    "Midi Dress", "Maxi Dress", "Silk Blouse", "Cashmere Sweater",
-    "Leather Jacket", "Wool Coat", "Tote Bag", "Crossbody Bag",
+    "Midi Dress", "Mini Dress", "Maxi Dress", "Silk Blouse", "Cashmere Sweater",
     "Ankle Boots", "Pumps", "Sneakers", "Scarf", "Belt",
     "Earrings", "Necklace", "Aviator Sunglasses", "Cat-Eye Sunglasses",
     "Trench Coat", "Blazer", "Wide-Leg Pants",
@@ -354,7 +371,7 @@ async function main() {
   const allProducts: any[] = [];
 
   for (const vendor of vendors) {
-    const numProducts = 15 + Math.floor(Math.random() * 25); // 15-40 products per vendor
+    const numProducts = 15 + Math.floor(Math.random() * 25);
     for (let i = 0; i < numProducts; i++) {
       const brand = brands[Math.floor(Math.random() * brands.length)];
       const category = categories[Math.floor(Math.random() * categories.length)];
@@ -391,7 +408,6 @@ async function main() {
         },
       });
 
-      // Add image
       await prisma.productImage.create({
         data: {
           productId: product.id,
@@ -400,7 +416,6 @@ async function main() {
         },
       });
 
-      // Add variants
       const numVariants = 3 + Math.floor(Math.random() * 3);
       for (let v = 0; v < numVariants; v++) {
         await prisma.productVariant.create({
@@ -424,7 +439,7 @@ async function main() {
   console.log(`✅ ${productCount} products created with variants and images`);
 
   // ============================================================
-  // ORDERS (realistic order data)
+  // ORDERS — Now using MarketplaceOrder + VendorOrder
   // ============================================================
   const customerNames = [
     "Sarah Johnson", "Michael Chen", "Emily Rodriguez", "James Wilson",
@@ -448,12 +463,12 @@ async function main() {
     const daysAgo = Math.floor(Math.random() * 90);
     const placedAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
 
-    // Pick 1-3 random vendors for this order
     const numVendors = 1 + Math.floor(Math.random() * 2);
     const orderVendors = [...vendors].sort(() => Math.random() - 0.5).slice(0, numVendors);
     let totalAmount = 0;
 
-    const order = await prisma.order.create({
+    // MarketplaceOrder (maps to "Order" table)
+    const order = await prisma.marketplaceOrder.create({
       data: {
         orderNumber: `LT-${String(7800 + i).padStart(6, "0")}`,
         shopifyOrderId: `${5000000000 + i}`,
@@ -483,7 +498,8 @@ async function main() {
         .slice(0, numItems);
 
       let subtotal = 0;
-      const subOrder = await prisma.subOrder.create({
+      // VendorOrder (maps to "SubOrder" table)
+      const vendorOrder = await prisma.vendorOrder.create({
         data: {
           orderId: order.id,
           vendorId: vendor.id,
@@ -511,7 +527,7 @@ async function main() {
 
         await prisma.orderItem.create({
           data: {
-            subOrderId: subOrder.id,
+            vendorOrderId: vendorOrder.id,
             productId: product.id,
             quantity: qty,
             unitPrice: price,
@@ -523,8 +539,8 @@ async function main() {
       }
 
       const commission = vendor.commissionRate ? subtotal * (vendor.commissionRate / 100) : 0;
-      await prisma.subOrder.update({
-        where: { id: subOrder.id },
+      await prisma.vendorOrder.update({
+        where: { id: vendorOrder.id },
         data: {
           subtotal,
           commission,
@@ -543,7 +559,7 @@ async function main() {
 
         await prisma.shipment.create({
           data: {
-            subOrderId: subOrder.id,
+            vendorOrderId: vendorOrder.id,
             vendorId: vendor.id,
             shippingModel: vendor.shippingModel,
             carrier: carriers[Math.floor(Math.random() * carriers.length)],
@@ -559,9 +575,24 @@ async function main() {
           },
         });
       }
+
+      // Create settlement for settled orders
+      if (status === "SETTLED") {
+        await prisma.settlement.create({
+          data: {
+            vendorId: vendor.id,
+            vendorOrderId: vendorOrder.id,
+            amount: subtotal - commission,
+            currency: vendor.currency,
+            status: "COMPLETED",
+            processorRef: `REV-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+            completedAt: new Date(placedAt.getTime() + 30 * 24 * 60 * 60 * 1000),
+          },
+        });
+      }
     }
 
-    await prisma.order.update({
+    await prisma.marketplaceOrder.update({
       where: { id: order.id },
       data: { totalAmount },
     });
@@ -569,12 +600,12 @@ async function main() {
     orderCount++;
   }
 
-  console.log(`✅ ${orderCount} orders created with sub-orders, items, and shipments`);
+  console.log(`✅ ${orderCount} orders created with vendor orders, items, shipments, and settlements`);
 
   // ============================================================
-  // RETURNS (sample returns)
+  // RETURNS
   // ============================================================
-  const deliveredSubOrders = await prisma.subOrder.findMany({
+  const deliveredVendorOrders = await prisma.vendorOrder.findMany({
     where: { status: "DELIVERED" },
     take: 25,
     include: { order: true },
@@ -584,22 +615,22 @@ async function main() {
     "INITIATED", "IN_TRANSIT", "RECEIVED_WAREHOUSE", "INSPECTING", "APPROVED", "REFUNDED",
   ];
 
-  for (const so of deliveredSubOrders) {
+  for (const vo of deliveredVendorOrders) {
     const retStatus = returnStatuses[Math.floor(Math.random() * returnStatuses.length)];
     await prisma.return.create({
       data: {
-        subOrderId: so.id,
-        vendorId: so.vendorId,
+        vendorOrderId: vo.id,
+        vendorId: vo.vendorId,
         status: retStatus,
         reason: ["Size too small", "Color different from photos", "Quality not as expected", "Changed mind", "Damaged in transit"][Math.floor(Math.random() * 5)],
-        refundAmount: retStatus === "REFUNDED" ? so.subtotal : null,
+        refundAmount: retStatus === "REFUNDED" ? vo.subtotal : null,
         initiatedAt: new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000),
         receivedAt: ["RECEIVED_WAREHOUSE", "INSPECTING", "APPROVED", "REFUNDED"].includes(retStatus) ? new Date() : null,
       },
     });
   }
 
-  console.log(`✅ ${deliveredSubOrders.length} returns created`);
+  console.log(`✅ ${deliveredVendorOrders.length} returns created`);
 
   // ============================================================
   // PAYOUTS
@@ -656,7 +687,6 @@ async function main() {
       },
     });
 
-    // Add messages to thread
     const numMessages = 1 + Math.floor(Math.random() * 4);
     for (let m = 0; m < numMessages; m++) {
       await prisma.message.create({
@@ -701,15 +731,43 @@ async function main() {
 
   console.log("✅ Vendor performance metrics created");
 
+  // ============================================================
+  // VENDOR ONBOARDING STEPS
+  // ============================================================
+  const onboardingSteps = [
+    "contract_signed",
+    "bank_details",
+    "shipping_config",
+    "catalog_uploaded",
+    "test_order_completed",
+    "go_live",
+  ];
+
+  for (const vendor of vendors) {
+    for (const step of onboardingSteps) {
+      await prisma.vendorOnboardingStep.create({
+        data: {
+          vendorId: vendor.id,
+          stepName: step,
+          status: vendor.onboardedAt ? "COMPLETED" : "PENDING",
+          completedAt: vendor.onboardedAt || null,
+        },
+      });
+    }
+  }
+
+  console.log("✅ Vendor onboarding steps created");
+
   console.log("\n🎉 Seed complete! LITE Platform database is ready.");
   console.log(`
   📊 Summary:
   - ${vendors.length} vendors
   - ${productCount} products
-  - ${orderCount} orders
-  - ${deliveredSubOrders.length} returns
+  - ${orderCount} marketplace orders
+  - ${deliveredVendorOrders.length} returns
   - 30 message threads
   - 3 admin users + ${vendors.length} vendor users
+  - ${vendors.length} vendor access records
   `);
 }
 

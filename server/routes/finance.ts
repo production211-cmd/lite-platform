@@ -43,6 +43,49 @@ export async function financeRoutes(app: FastifyInstance) {
     };
   });
 
+  // GET /api/finance/settlements
+  app.get("/settlements", async (request) => {
+    const { vendorId, status, page = "1", limit = "20" } = request.query as any;
+    const where: any = {};
+    if (vendorId) where.vendorId = vendorId;
+    if (status) where.status = status;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [settlements, total] = await Promise.all([
+      prisma.settlement.findMany({
+        where,
+        skip,
+        take: parseInt(limit),
+        include: {
+          vendor: { select: { id: true, name: true, currency: true } },
+          vendorOrder: { select: { id: true, orderId: true, subtotal: true } },
+          events: { orderBy: { createdAt: "desc" }, take: 5 },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.settlement.count({ where }),
+    ]);
+
+    return { settlements, total };
+  });
+
+  // GET /api/finance/settlements/stats
+  app.get("/settlements/stats", async () => {
+    const [pending, processing, completed, failed] = await Promise.all([
+      prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "PENDING" } }),
+      prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "PROCESSING" } }),
+      prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "COMPLETED" } }),
+      prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "FAILED" } }),
+    ]);
+
+    return {
+      pending: pending._sum.amount || 0,
+      processing: processing._sum.amount || 0,
+      completed: completed._sum.amount || 0,
+      failed: failed._sum.amount || 0,
+    };
+  });
+
   // GET /api/finance/deductions
   app.get("/deductions", async (request) => {
     const { vendorId, type, page = "1", limit = "20" } = request.query as any;
@@ -67,14 +110,12 @@ export async function financeRoutes(app: FastifyInstance) {
 
   // GET /api/finance/pnl - Profit & Loss summary
   app.get("/pnl", async (request) => {
-    const { period } = request.query as any; // e.g., "2026-04"
-
-    const revenue = await prisma.order.aggregate({
+    const revenue = await prisma.marketplaceOrder.aggregate({
       _sum: { totalAmount: true },
       where: { status: { notIn: ["CANCELLED"] } },
     });
 
-    const commissions = await prisma.subOrder.aggregate({
+    const commissions = await prisma.vendorOrder.aggregate({
       _sum: { commission: true },
     });
 
@@ -124,14 +165,14 @@ export async function financeRoutes(app: FastifyInstance) {
         name: true,
         currency: true,
         payoutCycle: true,
-        _count: { select: { payouts: true, deductions: true } },
+        _count: { select: { payouts: true, deductions: true, settlements: true } },
       },
     });
 
     const balances = await Promise.all(
       vendors.map(async (v: any) => {
-        const [earned, paid, deducted] = await Promise.all([
-          prisma.subOrder.aggregate({
+        const [earned, paid, deducted, settled] = await Promise.all([
+          prisma.vendorOrder.aggregate({
             _sum: { vendorEarnings: true },
             where: { vendorId: v.id, status: { in: ["DELIVERED", "SETTLED"] } },
           }),
@@ -143,6 +184,10 @@ export async function financeRoutes(app: FastifyInstance) {
             _sum: { amount: true },
             where: { vendorId: v.id, isApplied: true },
           }),
+          prisma.settlement.aggregate({
+            _sum: { amount: true },
+            where: { vendorId: v.id, status: "COMPLETED" },
+          }),
         ]);
 
         return {
@@ -150,6 +195,7 @@ export async function financeRoutes(app: FastifyInstance) {
           totalEarned: earned._sum.vendorEarnings || 0,
           totalPaid: paid._sum.amount || 0,
           totalDeducted: deducted._sum.amount || 0,
+          totalSettled: settled._sum.amount || 0,
           balance:
             (earned._sum.vendorEarnings || 0) -
             (paid._sum.amount || 0) -

@@ -1,76 +1,28 @@
-import { Route, Switch } from "wouter";
+/**
+ * App.tsx — Layout Route Pattern
+ * ===============================
+ * Per Perplexity critique (Mistake 4A):
+ * Three separate layout components as nested route parents.
+ * NO conditional layout checks — each shell is its own route tree.
+ *
+ * - /             → AdminShell (RETAILER_LT)
+ * - /vendor/*     → VendorShell (VENDOR_USER, full sidebar)
+ * - /vendor/portal/* → VendorPortalShell (VENDOR, stripped layout)
+ * - /login        → Login page (public)
+ */
+
+import { Route, Switch, useLocation, Redirect } from "wouter";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
-import { Sidebar } from "@/components/Sidebar";
-import { TopBar } from "@/components/TopBar";
+import { AdminShell } from "@/layouts/AdminShell";
+import { VendorShell } from "@/layouts/VendorShell";
+import { VendorPortalShell } from "@/layouts/VendorPortalShell";
 import Login from "@/pages/Login";
-import Dashboard from "@/pages/Dashboard";
-import Vendors from "@/pages/Vendors";
-import Products from "@/pages/Products";
-import Orders from "@/pages/Orders";
-import Shipping from "@/pages/Shipping";
-import Messages from "@/pages/Messages";
-import Finance from "@/pages/Finance";
-import Returns from "@/pages/Returns";
-import {
-  Ads, Marketing, SettingsPage, OrderAnalytics, Issues,
-  PendingOrders, ProductPricing, ProductEnrichment, PendingProducts,
-  ShippingCosts, ShippingSettings, Payouts, Deductions, VendorBalances,
-} from "@/pages/Placeholder";
 
-function AppContent() {
-  const { collapsed } = useSidebar();
-  const sidebarWidth = collapsed ? 72 : 288;
+function AppRouter() {
+  const { user, isAuthenticated, isLoading, isRetailer, isVendorFull, isVendorPortal } = useAuth();
+  const [location] = useLocation();
 
-  return (
-    <div className="flex h-screen bg-[#F5F6F7]">
-      <Sidebar />
-      <div
-        className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
-        style={{ marginLeft: `${sidebarWidth}px` }}
-      >
-        <TopBar />
-        <main className="flex-1 overflow-y-auto">
-          <Switch>
-            <Route path="/" component={Dashboard} />
-            <Route path="/vendors" component={Vendors} />
-            <Route path="/vendors/performance">{() => <div className="p-8"><h2 className="font-heading small-caps text-2xl">Vendor Performance</h2><p className="text-gray-500 mt-2">Coming soon</p></div>}</Route>
-            <Route path="/vendors/:id">{() => <div className="p-8"><h2 className="font-heading small-caps text-2xl">Vendor Detail</h2></div>}</Route>
-            <Route path="/products" component={Products} />
-            <Route path="/products/pending" component={PendingProducts} />
-            <Route path="/products/pricing" component={ProductPricing} />
-            <Route path="/products/enrichment" component={ProductEnrichment} />
-            <Route path="/orders" component={Orders} />
-            <Route path="/orders/pending" component={PendingOrders} />
-            <Route path="/orders/returns" component={Returns} />
-            <Route path="/orders/issues" component={Issues} />
-            <Route path="/orders/analytics" component={OrderAnalytics} />
-            <Route path="/shipping" component={Shipping} />
-            <Route path="/shipping/costs" component={ShippingCosts} />
-            <Route path="/shipping/settings" component={ShippingSettings} />
-            <Route path="/messages" component={Messages} />
-            <Route path="/finance" component={Finance} />
-            <Route path="/finance/payouts" component={Payouts} />
-            <Route path="/finance/deductions" component={Deductions} />
-            <Route path="/finance/balances" component={VendorBalances} />
-            <Route path="/ads" component={Ads} />
-            <Route path="/marketing" component={Marketing} />
-            <Route path="/settings" component={SettingsPage} />
-            <Route>
-              <div className="flex items-center justify-center h-[60vh]">
-                <p className="text-gray-500">Page not found</p>
-              </div>
-            </Route>
-          </Switch>
-        </main>
-      </div>
-    </div>
-  );
-}
-
-function AppLayout() {
-  const { isAuthenticated, isLoading } = useAuth();
-
+  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F6F7]">
@@ -84,21 +36,58 @@ function AppLayout() {
     );
   }
 
+  // Not authenticated → show login
   if (!isAuthenticated) {
     return <Login />;
   }
 
+  // Authenticated → route to appropriate shell based on role
+  // Vendor portal-only users trying to access non-portal routes → redirect
+  if (isVendorPortal && !location.startsWith("/vendor/portal")) {
+    return <Redirect to="/vendor/portal" />;
+  }
+
+  // Vendor full users trying to access admin routes → redirect
+  if (isVendorFull && !location.startsWith("/vendor")) {
+    return <Redirect to="/vendor" />;
+  }
+
+  // Retailer users trying to access vendor routes → redirect
+  if (isRetailer && location.startsWith("/vendor")) {
+    return <Redirect to="/" />;
+  }
+
   return (
-    <SidebarProvider>
-      <AppContent />
-    </SidebarProvider>
+    <Switch>
+      {/* Vendor Portal Shell — stripped layout, no sidebar */}
+      {/* MUST be before /vendor/* to match first */}
+      <Route path="/vendor/portal/:rest*">
+        <VendorPortalShell />
+      </Route>
+      <Route path="/vendor/portal">
+        <VendorPortalShell />
+      </Route>
+
+      {/* Vendor Shell — full sidebar */}
+      <Route path="/vendor/:rest*">
+        <VendorShell />
+      </Route>
+      <Route path="/vendor">
+        <VendorShell />
+      </Route>
+
+      {/* Admin Shell — full sidebar (default for RETAILER_LT) */}
+      <Route path="/:rest*">
+        <AdminShell />
+      </Route>
+    </Switch>
   );
 }
 
 export default function App() {
   return (
     <AuthProvider>
-      <AppLayout />
+      <AppRouter />
     </AuthProvider>
   );
 }

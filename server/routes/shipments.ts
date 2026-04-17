@@ -23,7 +23,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
         take: parseInt(limit),
         include: {
           vendor: { select: { id: true, name: true } },
-          subOrder: {
+          vendorOrder: {
             include: {
               order: { select: { id: true, orderNumber: true, customerName: true } },
               items: { include: { product: { select: { id: true, title: true } } } },
@@ -64,7 +64,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
       where: { id },
       include: {
         vendor: true,
-        subOrder: {
+        vendorOrder: {
           include: {
             order: true,
             items: { include: { product: { include: { images: { take: 1 } } }, variant: true } },
@@ -93,10 +93,11 @@ export async function shipmentRoutes(app: FastifyInstance) {
       where: { id },
       data: { status: "LABEL_VOIDED", labelVoidedAt: new Date() },
     });
-    // Log the void
-    await prisma.labelLog.create({
+    // Log the void using typed LabelGenerationLog
+    await prisma.labelGenerationLog.create({
       data: {
         shipmentId: id,
+        vendorOrderId: shipment.vendorOrderId,
         trackingNumber: shipment.trackingNumber,
         action: "voided",
         carrier: shipment.carrier,

@@ -1,6 +1,7 @@
 // Shared types between client and server
 
-export type UserRole = "RETAILER_LT" | "VENDOR_USER";
+export type UserRole = "RETAILER_LT" | "VENDOR_USER" | "VENDOR";
+export type PortalType = "FULL" | "PORTAL";
 
 export interface AuthUser {
   id: string;
@@ -10,6 +11,7 @@ export interface AuthUser {
   role: UserRole;
   vendorId?: string | null;
   vendorName?: string | null;
+  portalType?: PortalType | null;
 }
 
 export interface LoginRequest {
@@ -46,6 +48,12 @@ export type ReturnStatus =
   | "INITIATED" | "LABEL_GENERATED" | "IN_TRANSIT" | "RECEIVED_WAREHOUSE"
   | "INSPECTING" | "APPROVED" | "REJECTED" | "REFUNDED" | "FORWARDED_TO_VENDOR" | "COMPLETED";
 
+export type PayoutStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "ON_HOLD";
+
+export type SettlementStatus =
+  | "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED"
+  | "PARTIALLY_PAID" | "DISPUTED" | "CANCELLED";
+
 export type MessageDepartment = "OPS" | "RMS" | "CX" | "CATALOG_BUYER" | "VENDOR_SUPPORT";
 export type MessagePriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 export type MessageStatus = "OPEN" | "PENDING" | "RESOLVED" | "CLOSED";
@@ -55,6 +63,8 @@ export type PricingStrategy =
   | "CLEARANCE_PRICING" | "EVENT_PRICING";
 
 export type Carrier = "FEDEX" | "DHL" | "UPS";
+
+export type OnboardingStepStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "SKIPPED";
 
 // Dashboard KPIs
 export interface DashboardKPIs {

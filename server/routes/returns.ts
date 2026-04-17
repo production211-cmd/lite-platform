@@ -18,7 +18,7 @@ export async function returnRoutes(app: FastifyInstance) {
         take: parseInt(limit),
         include: {
           vendor: { select: { id: true, name: true } },
-          subOrder: {
+          vendorOrder: {
             include: {
               order: { select: { id: true, orderNumber: true, customerName: true } },
               items: { include: { product: { select: { id: true, title: true, images: { take: 1 } } } } },
@@ -59,7 +59,7 @@ export async function returnRoutes(app: FastifyInstance) {
       where: { id },
       include: {
         vendor: true,
-        subOrder: {
+        vendorOrder: {
           include: {
             order: true,
             items: { include: { product: { include: { images: true } }, variant: true } },

@@ -3,7 +3,7 @@ import { FastifyInstance } from "fastify";
 export async function orderRoutes(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
-  // GET /api/orders - all orders with filters
+  // GET /api/orders - all marketplace orders with filters
   app.get("/", async (request) => {
     const {
       search, status, vendorId, dateFrom, dateTo,
@@ -27,12 +27,12 @@ export async function orderRoutes(app: FastifyInstance) {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const [orders, total] = await Promise.all([
-      prisma.order.findMany({
+      prisma.marketplaceOrder.findMany({
         where,
         skip,
         take: parseInt(limit),
         include: {
-          subOrders: {
+          vendorOrders: {
             include: {
               vendor: { select: { id: true, name: true, slug: true } },
               items: {
@@ -46,7 +46,7 @@ export async function orderRoutes(app: FastifyInstance) {
         },
         orderBy: { [sortBy]: sortOrder },
       }),
-      prisma.order.count({ where }),
+      prisma.marketplaceOrder.count({ where }),
     ]);
 
     return { orders, total, page: parseInt(page), limit: parseInt(limit) };
@@ -56,17 +56,17 @@ export async function orderRoutes(app: FastifyInstance) {
   app.get("/stats", async () => {
     const [total, placed, fraudHold, pendingAccept, shipped, inTransit, delivered, cancelled] =
       await Promise.all([
-        prisma.order.count(),
-        prisma.order.count({ where: { status: "PLACED" } }),
-        prisma.order.count({ where: { status: "FRAUD_HOLD" } }),
-        prisma.order.count({ where: { status: "VENDOR_ACCEPT" } }),
-        prisma.order.count({ where: { status: "SHIPPED" } }),
-        prisma.order.count({ where: { status: "IN_TRANSIT" } }),
-        prisma.order.count({ where: { status: "DELIVERED" } }),
-        prisma.order.count({ where: { status: "CANCELLED" } }),
+        prisma.marketplaceOrder.count(),
+        prisma.marketplaceOrder.count({ where: { status: "PLACED" } }),
+        prisma.marketplaceOrder.count({ where: { status: "FRAUD_HOLD" } }),
+        prisma.marketplaceOrder.count({ where: { status: "VENDOR_ACCEPT" } }),
+        prisma.marketplaceOrder.count({ where: { status: "SHIPPED" } }),
+        prisma.marketplaceOrder.count({ where: { status: "IN_TRANSIT" } }),
+        prisma.marketplaceOrder.count({ where: { status: "DELIVERED" } }),
+        prisma.marketplaceOrder.count({ where: { status: "CANCELLED" } }),
       ]);
 
-    const revenue = await prisma.order.aggregate({
+    const revenue = await prisma.marketplaceOrder.aggregate({
       _sum: { totalAmount: true },
       where: { status: { notIn: ["CANCELLED"] } },
     });
@@ -84,8 +84,8 @@ export async function orderRoutes(app: FastifyInstance) {
     if (vendorId) where.vendorId = vendorId;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [subOrders, total] = await Promise.all([
-      prisma.subOrder.findMany({
+    const [vendorOrders, total] = await Promise.all([
+      prisma.vendorOrder.findMany({
         where,
         skip,
         take: parseInt(limit),
@@ -96,19 +96,19 @@ export async function orderRoutes(app: FastifyInstance) {
         },
         orderBy: { createdAt: "desc" },
       }),
-      prisma.subOrder.count({ where }),
+      prisma.vendorOrder.count({ where }),
     ]);
 
-    return { orders: subOrders, total };
+    return { orders: vendorOrders, total };
   });
 
   // GET /api/orders/:id
   app.get("/:id", async (request) => {
     const { id } = request.params as { id: string };
-    const order = await prisma.order.findUnique({
+    const order = await prisma.marketplaceOrder.findUnique({
       where: { id },
       include: {
-        subOrders: {
+        vendorOrders: {
           include: {
             vendor: true,
             items: {
@@ -119,6 +119,7 @@ export async function orderRoutes(app: FastifyInstance) {
             },
             shipments: { include: { trackingEvents: { orderBy: { timestamp: "desc" } } } },
             returns: true,
+            settlements: true,
           },
         },
         priceSnapshot: true,
@@ -128,28 +129,28 @@ export async function orderRoutes(app: FastifyInstance) {
     return order;
   });
 
-  // POST /api/orders/:subOrderId/accept
-  app.post("/:subOrderId/accept", async (request) => {
-    const { subOrderId } = request.params as { subOrderId: string };
-    const subOrder = await prisma.subOrder.update({
-      where: { id: subOrderId },
+  // POST /api/orders/:vendorOrderId/accept
+  app.post("/:vendorOrderId/accept", async (request) => {
+    const { vendorOrderId } = request.params as { vendorOrderId: string };
+    const vendorOrder = await prisma.vendorOrder.update({
+      where: { id: vendorOrderId },
       data: { status: "VENDOR_ACCEPT", acceptedAt: new Date() },
     });
-    return subOrder;
+    return vendorOrder;
   });
 
-  // POST /api/orders/:subOrderId/reject
-  app.post("/:subOrderId/reject", async (request) => {
-    const { subOrderId } = request.params as { subOrderId: string };
+  // POST /api/orders/:vendorOrderId/reject
+  app.post("/:vendorOrderId/reject", async (request) => {
+    const { vendorOrderId } = request.params as { vendorOrderId: string };
     const { reason } = request.body as { reason: string };
-    const subOrder = await prisma.subOrder.update({
-      where: { id: subOrderId },
+    const vendorOrder = await prisma.vendorOrder.update({
+      where: { id: vendorOrderId },
       data: {
         status: "VENDOR_REJECTED",
         rejectedAt: new Date(),
         rejectionReason: reason,
       },
     });
-    return subOrder;
+    return vendorOrder;
   });
 }

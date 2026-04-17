@@ -10,7 +10,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
-    const orders = await prisma.order.findMany({
+    const orders = await prisma.marketplaceOrder.findMany({
       where: { placedAt: { gte: startDate } },
       select: { placedAt: true, totalAmount: true, status: true },
     });
@@ -38,22 +38,22 @@ export async function analyticsRoutes(app: FastifyInstance) {
       where: { isActive: true },
       select: {
         id: true, name: true, location: true, economicModel: true,
-        _count: { select: { products: true, subOrders: true, returns: true } },
+        _count: { select: { products: true, vendorOrders: true, returns: true } },
       },
     });
 
     const vendorStats = await Promise.all(
       vendors.map(async (v: any) => {
         const [revenue, returns] = await Promise.all([
-          prisma.subOrder.aggregate({
+          prisma.vendorOrder.aggregate({
             _sum: { subtotal: true, commission: true },
             where: { vendorId: v.id },
           }),
           prisma.return.count({ where: { vendorId: v.id } }),
         ]);
 
-        const returnRate = v._count.subOrders > 0
-          ? (returns / v._count.subOrders) * 100
+        const returnRate = v._count.vendorOrders > 0
+          ? (returns / v._count.vendorOrders) * 100
           : 0;
 
         return {

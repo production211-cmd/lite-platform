@@ -1,129 +1,295 @@
-import { FastifyInstance } from "fastify";
+/**
+ * Vendor Routes — CRUD with RBAC & Tenant Scoping
+ * ==================================================
+ * Phase 1 Security Foundation Applied:
+ * - All routes require authentication (global hook)
+ * - requireRole() for write operations (RETAILER_LT only)
+ * - getTenantFilter() for vendor data isolation
+ * - canAccessVendor() for detail/sub-resource access
+ * - Zod validation on all request bodies
+ */
+
+import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { requireRole, getTenantFilter, canAccessVendor } from "../middleware/auth.js";
+import {
+  CreateVendorSchema,
+  UpdateVendorSchema,
+  VendorFilterSchema,
+} from "../lib/schemas.js";
 
 export async function vendorRoutes(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
-  // GET /api/vendors - list all vendors
-  app.get("/", async (request) => {
-    const { search, location, economicModel, status, page = "1", limit = "20" } =
-      request.query as any;
+  // ============================================================
+  // GET /api/vendors — List vendors (filtered by role)
+  // ============================================================
+  app.get("/", async (request: FastifyRequest, reply: FastifyReply) => {
+    const queryResult = VendorFilterSchema.safeParse(request.query);
+    const query = queryResult.success
+      ? queryResult.data
+      : { page: 1, limit: 20, sortOrder: "desc" as const };
 
-    const where: any = {};
-    if (search) {
+    const tenantFilter = getTenantFilter(request);
+    const where: any = { ...tenantFilter };
+
+    if (query.economicModel) where.economicModel = query.economicModel;
+    if (query.location) where.location = query.location;
+    if (query.isActive !== undefined) where.isActive = query.isActive;
+    if (query.search) {
       where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { slug: { contains: search, mode: "insensitive" } },
+        { name: { contains: query.search, mode: "insensitive" } },
+        { slug: { contains: query.search, mode: "insensitive" } },
+        { contactEmail: { contains: query.search, mode: "insensitive" } },
       ];
     }
-    if (location) where.location = location;
-    if (economicModel) where.economicModel = economicModel;
-    if (status !== undefined) where.isActive = status === "active";
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (query.page - 1) * query.limit;
     const [vendors, total] = await Promise.all([
       prisma.vendor.findMany({
         where,
         skip,
-        take: parseInt(limit),
+        take: query.limit,
+        orderBy: { createdAt: query.sortOrder },
         include: {
-          _count: { select: { products: true, subOrders: true } },
+          _count: { select: { products: true, vendorOrders: true, users: true } },
         },
-        orderBy: { createdAt: "desc" },
       }),
       prisma.vendor.count({ where }),
     ]);
 
-    return { vendors, total, page: parseInt(page), limit: parseInt(limit) };
+    return {
+      vendors,
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(total / query.limit),
+    };
   });
 
-  // GET /api/vendors/:id
-  app.get("/:id", async (request) => {
+  // ============================================================
+  // GET /api/vendors/:id — Get vendor detail
+  // ============================================================
+  app.get("/:id", async (request: FastifyRequest, reply: FastifyReply) => {
     const { id } = request.params as { id: string };
+
+    if (!canAccessVendor(request, id)) {
+      return reply.status(403).send({ error: "Access denied to this vendor" });
+    }
+
     const vendor = await prisma.vendor.findUnique({
       where: { id },
       include: {
         connectorConfig: true,
+        users: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            isActive: true,
+          },
+        },
         _count: {
-          select: { products: true, subOrders: true, returns: true, payouts: true },
+          select: {
+            products: true,
+            vendorOrders: true,
+            shipments: true,
+            returns: true,
+            payouts: true,
+            settlements: true,
+          },
         },
       },
     });
-    if (!vendor) return { error: "Vendor not found" };
+
+    if (!vendor) {
+      return reply.status(404).send({ error: "Vendor not found" });
+    }
+
     return vendor;
   });
 
-  // POST /api/vendors
-  app.post("/", async (request) => {
-    const data = request.body as any;
-    const vendor = await prisma.vendor.create({ data });
-    return vendor;
-  });
+  // ============================================================
+  // POST /api/vendors — Create vendor (RETAILER_LT only)
+  // ============================================================
+  app.post(
+    "/",
+    { preHandler: [requireRole("RETAILER_LT")] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const parseResult = CreateVendorSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: "Validation Error",
+          details: parseResult.error.issues.map((i) => ({
+            path: i.path.join("."),
+            message: i.message,
+          })),
+        });
+      }
 
-  // PUT /api/vendors/:id
-  app.put("/:id", async (request) => {
-    const { id } = request.params as { id: string };
-    const data = request.body as any;
-    const vendor = await prisma.vendor.update({ where: { id }, data });
-    return vendor;
-  });
+      const data = parseResult.data;
 
-  // GET /api/vendors/:id/performance
-  app.get("/:id/performance", async (request) => {
-    const { id } = request.params as { id: string };
-    const metrics = await prisma.vendorPerformance.findMany({
-      where: { vendorId: id },
-      orderBy: { period: "desc" },
-      take: 12,
-    });
-    return metrics;
-  });
+      // Check slug uniqueness
+      const existing = await prisma.vendor.findUnique({
+        where: { slug: data.slug },
+      });
+      if (existing) {
+        return reply.status(409).send({ error: "Vendor slug already exists" });
+      }
 
-  // GET /api/vendors/:id/products
-  app.get("/:id/products", async (request) => {
-    const { id } = request.params as { id: string };
-    const { status, page = "1", limit = "20" } = request.query as any;
+      const vendor = await prisma.vendor.create({ data });
+      return reply.status(201).send(vendor);
+    }
+  );
 
-    const where: any = { vendorId: id };
-    if (status) where.status = status;
+  // ============================================================
+  // PUT /api/vendors/:id — Update vendor (RETAILER_LT only)
+  // ============================================================
+  app.put(
+    "/:id",
+    { preHandler: [requireRole("RETAILER_LT")] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        include: { images: { take: 1 }, variants: true },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.product.count({ where }),
-    ]);
+      const parseResult = UpdateVendorSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: "Validation Error",
+          details: parseResult.error.issues.map((i) => ({
+            path: i.path.join("."),
+            message: i.message,
+          })),
+        });
+      }
 
-    return { products, total };
-  });
+      const vendor = await prisma.vendor.findUnique({ where: { id } });
+      if (!vendor) {
+        return reply.status(404).send({ error: "Vendor not found" });
+      }
 
-  // GET /api/vendors/:id/orders
-  app.get("/:id/orders", async (request) => {
-    const { id } = request.params as { id: string };
-    const { status, page = "1", limit = "20" } = request.query as any;
+      const updated = await prisma.vendor.update({
+        where: { id },
+        data: parseResult.data,
+      });
 
-    const where: any = { vendorId: id };
-    if (status) where.status = status;
+      return updated;
+    }
+  );
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [subOrders, total] = await Promise.all([
-      prisma.subOrder.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        include: {
-          order: true,
-          items: { include: { product: { include: { images: { take: 1 } } } } },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.subOrder.count({ where }),
-    ]);
+  // ============================================================
+  // DELETE /api/vendors/:id — Soft-delete vendor (RETAILER_LT only)
+  // ============================================================
+  app.delete(
+    "/:id",
+    { preHandler: [requireRole("RETAILER_LT")] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
 
-    return { orders: subOrders, total };
-  });
+      const vendor = await prisma.vendor.findUnique({ where: { id } });
+      if (!vendor) {
+        return reply.status(404).send({ error: "Vendor not found" });
+      }
+
+      await prisma.vendor.update({
+        where: { id },
+        data: { isActive: false },
+      });
+
+      return { success: true, message: "Vendor deactivated" };
+    }
+  );
+
+  // ============================================================
+  // GET /api/vendors/:id/performance — Vendor performance metrics
+  // ============================================================
+  app.get(
+    "/:id/performance",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
+
+      if (!canAccessVendor(request, id)) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const metrics = await prisma.vendorPerformance.findMany({
+        where: { vendorId: id },
+        orderBy: { period: "desc" },
+        take: 12,
+      });
+
+      return metrics;
+    }
+  );
+
+  // ============================================================
+  // GET /api/vendors/:id/products — Vendor's products (scoped)
+  // ============================================================
+  app.get(
+    "/:id/products",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
+
+      if (!canAccessVendor(request, id)) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const { status, page = "1", limit = "20" } = request.query as any;
+
+      const where: any = { vendorId: id };
+      if (status) where.status = status;
+
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const [products, total] = await Promise.all([
+        prisma.product.findMany({
+          where,
+          skip,
+          take: parseInt(limit),
+          include: { images: { take: 1 }, variants: true },
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.product.count({ where }),
+      ]);
+
+      return { products, total };
+    }
+  );
+
+  // ============================================================
+  // GET /api/vendors/:id/orders — Vendor's orders (scoped)
+  // ============================================================
+  app.get(
+    "/:id/orders",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
+
+      if (!canAccessVendor(request, id)) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const { status, page = "1", limit = "20" } = request.query as any;
+
+      const where: any = { vendorId: id };
+      if (status) where.status = status;
+
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const [vendorOrders, total] = await Promise.all([
+        prisma.vendorOrder.findMany({
+          where,
+          skip,
+          take: parseInt(limit),
+          include: {
+            order: true,
+            items: {
+              include: { product: { include: { images: { take: 1 } } } },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.vendorOrder.count({ where }),
+      ]);
+
+      return { orders: vendorOrders, total };
+    }
+  );
 }
