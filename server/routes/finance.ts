@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { withRls } from "../lib/rls-tx.js";
 
 export async function financeRoutes(app: FastifyInstance) {
   const prisma = (app as any).prisma;
@@ -11,36 +12,45 @@ export async function financeRoutes(app: FastifyInstance) {
     if (status) where.status = status;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [payouts, total] = await Promise.all([
-      prisma.payout.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        include: {
-          vendor: { select: { id: true, name: true, currency: true } },
-          items: true,
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.payout.count({ where }),
-    ]);
+
+    // Payout has RLS
+    const { payouts, total } = await withRls(prisma, request, async (tx) => {
+      const [payouts, total] = await Promise.all([
+        tx.payout.findMany({
+          where,
+          skip,
+          take: parseInt(limit),
+          include: {
+            vendor: { select: { id: true, name: true, currency: true } },
+            items: true,
+          },
+          orderBy: { createdAt: "desc" },
+        }),
+        tx.payout.count({ where }),
+      ]);
+      return { payouts, total };
+    });
 
     return { payouts, total };
   });
 
   // GET /api/finance/payouts/stats
-  app.get("/payouts/stats", async () => {
-    const [totalPending, totalProcessing, totalCompleted] = await Promise.all([
-      prisma.payout.aggregate({ _sum: { amount: true }, where: { status: "PENDING" } }),
-      prisma.payout.aggregate({ _sum: { amount: true }, where: { status: "PROCESSING" } }),
-      prisma.payout.aggregate({ _sum: { amount: true }, where: { status: "COMPLETED" } }),
-    ]);
+  app.get("/payouts/stats", async (request) => {
+    const result = await withRls(prisma, request, async (tx) => {
+      const [totalPending, totalProcessing, totalCompleted] = await Promise.all([
+        tx.payout.aggregate({ _sum: { amount: true }, where: { status: "PENDING" } }),
+        tx.payout.aggregate({ _sum: { amount: true }, where: { status: "PROCESSING" } }),
+        tx.payout.aggregate({ _sum: { amount: true }, where: { status: "COMPLETED" } }),
+      ]);
 
-    return {
-      pending: totalPending._sum.amount || 0,
-      processing: totalProcessing._sum.amount || 0,
-      completed: totalCompleted._sum.amount || 0,
-    };
+      return {
+        pending: totalPending._sum.amount || 0,
+        processing: totalProcessing._sum.amount || 0,
+        completed: totalCompleted._sum.amount || 0,
+      };
+    });
+
+    return result;
   });
 
   // GET /api/finance/settlements
@@ -51,39 +61,48 @@ export async function financeRoutes(app: FastifyInstance) {
     if (status) where.status = status;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [settlements, total] = await Promise.all([
-      prisma.settlement.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        include: {
-          vendor: { select: { id: true, name: true, currency: true } },
-          vendorOrder: { select: { id: true, orderId: true, subtotal: true } },
-          events: { orderBy: { createdAt: "desc" }, take: 5 },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.settlement.count({ where }),
-    ]);
+
+    // Settlement has RLS
+    const { settlements, total } = await withRls(prisma, request, async (tx) => {
+      const [settlements, total] = await Promise.all([
+        tx.settlement.findMany({
+          where,
+          skip,
+          take: parseInt(limit),
+          include: {
+            vendor: { select: { id: true, name: true, currency: true } },
+            vendorOrder: { select: { id: true, orderId: true, subtotal: true } },
+            events: { orderBy: { createdAt: "desc" }, take: 5 },
+          },
+          orderBy: { createdAt: "desc" },
+        }),
+        tx.settlement.count({ where }),
+      ]);
+      return { settlements, total };
+    });
 
     return { settlements, total };
   });
 
   // GET /api/finance/settlements/stats
-  app.get("/settlements/stats", async () => {
-    const [pending, processing, completed, failed] = await Promise.all([
-      prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "PENDING" } }),
-      prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "PROCESSING" } }),
-      prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "COMPLETED" } }),
-      prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "FAILED" } }),
-    ]);
+  app.get("/settlements/stats", async (request) => {
+    const result = await withRls(prisma, request, async (tx) => {
+      const [pending, processing, completed, failed] = await Promise.all([
+        tx.settlement.aggregate({ _sum: { amount: true }, where: { status: "PENDING" } }),
+        tx.settlement.aggregate({ _sum: { amount: true }, where: { status: "PROCESSING" } }),
+        tx.settlement.aggregate({ _sum: { amount: true }, where: { status: "COMPLETED" } }),
+        tx.settlement.aggregate({ _sum: { amount: true }, where: { status: "FAILED" } }),
+      ]);
 
-    return {
-      pending: pending._sum.amount || 0,
-      processing: processing._sum.amount || 0,
-      completed: completed._sum.amount || 0,
-      failed: failed._sum.amount || 0,
-    };
+      return {
+        pending: pending._sum.amount || 0,
+        processing: processing._sum.amount || 0,
+        completed: completed._sum.amount || 0,
+        failed: failed._sum.amount || 0,
+      };
+    });
+
+    return result;
   });
 
   // GET /api/finance/deductions
@@ -94,115 +113,130 @@ export async function financeRoutes(app: FastifyInstance) {
     if (type) where.type = type;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [deductions, total] = await Promise.all([
-      prisma.deduction.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        include: { vendor: { select: { id: true, name: true } } },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.deduction.count({ where }),
-    ]);
+
+    // Deduction has RLS
+    const { deductions, total } = await withRls(prisma, request, async (tx) => {
+      const [deductions, total] = await Promise.all([
+        tx.deduction.findMany({
+          where,
+          skip,
+          take: parseInt(limit),
+          include: { vendor: { select: { id: true, name: true } } },
+          orderBy: { createdAt: "desc" },
+        }),
+        tx.deduction.count({ where }),
+      ]);
+      return { deductions, total };
+    });
 
     return { deductions, total };
   });
 
   // GET /api/finance/pnl - Profit & Loss summary
   app.get("/pnl", async (request) => {
-    const revenue = await prisma.marketplaceOrder.aggregate({
-      _sum: { totalAmount: true },
-      where: { status: { notIn: ["CANCELLED"] } },
+    // Multiple RLS-protected tables: vendorOrder, shipment, return, deduction
+    const result = await withRls(prisma, request, async (tx) => {
+      const revenue = await tx.marketplaceOrder.aggregate({
+        _sum: { totalAmount: true },
+        where: { status: { notIn: ["CANCELLED"] } },
+      });
+
+      const commissions = await tx.vendorOrder.aggregate({
+        _sum: { commission: true },
+      });
+
+      const shippingCosts = await tx.shipment.aggregate({
+        _sum: { shippingCost: true },
+      });
+
+      const refunds = await tx.return.aggregate({
+        _sum: { refundAmount: true },
+        where: { status: "REFUNDED" },
+      });
+
+      const deductions = await tx.deduction.aggregate({
+        _sum: { amount: true },
+        where: { isApplied: true },
+      });
+
+      const totalRevenue = revenue._sum.totalAmount || 0;
+      const totalCommissions = commissions._sum.commission || 0;
+      const totalShipping = shippingCosts._sum.shippingCost || 0;
+      const totalRefunds = refunds._sum.refundAmount || 0;
+      const totalDeductions = deductions._sum.amount || 0;
+      const cogs = totalRevenue - totalCommissions;
+      const grossProfit = totalCommissions;
+      const operatingExpenses = totalShipping + totalRefunds;
+      const netProfit = grossProfit - operatingExpenses;
+
+      return {
+        revenue: totalRevenue,
+        cogs,
+        grossProfit,
+        commissions: totalCommissions,
+        shippingCosts: totalShipping,
+        refunds: totalRefunds,
+        deductions: totalDeductions,
+        operatingExpenses,
+        netProfit,
+      };
     });
 
-    const commissions = await prisma.vendorOrder.aggregate({
-      _sum: { commission: true },
-    });
-
-    const shippingCosts = await prisma.shipment.aggregate({
-      _sum: { shippingCost: true },
-    });
-
-    const refunds = await prisma.return.aggregate({
-      _sum: { refundAmount: true },
-      where: { status: "REFUNDED" },
-    });
-
-    const deductions = await prisma.deduction.aggregate({
-      _sum: { amount: true },
-      where: { isApplied: true },
-    });
-
-    const totalRevenue = revenue._sum.totalAmount || 0;
-    const totalCommissions = commissions._sum.commission || 0;
-    const totalShipping = shippingCosts._sum.shippingCost || 0;
-    const totalRefunds = refunds._sum.refundAmount || 0;
-    const totalDeductions = deductions._sum.amount || 0;
-    const cogs = totalRevenue - totalCommissions;
-    const grossProfit = totalCommissions;
-    const operatingExpenses = totalShipping + totalRefunds;
-    const netProfit = grossProfit - operatingExpenses;
-
-    return {
-      revenue: totalRevenue,
-      cogs,
-      grossProfit,
-      commissions: totalCommissions,
-      shippingCosts: totalShipping,
-      refunds: totalRefunds,
-      deductions: totalDeductions,
-      operatingExpenses,
-      netProfit,
-    };
+    return result;
   });
 
   // GET /api/finance/vendor-balances
-  app.get("/vendor-balances", async () => {
-    const vendors = await prisma.vendor.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        name: true,
-        currency: true,
-        payoutCycle: true,
-        _count: { select: { payouts: true, deductions: true, settlements: true } },
-      },
+  app.get("/vendor-balances", async (request) => {
+    // VendorOrder, Payout, Deduction, Settlement all have RLS
+    const balances = await withRls(prisma, request, async (tx) => {
+      const vendors = await tx.vendor.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          currency: true,
+          payoutCycle: true,
+          _count: { select: { payouts: true, deductions: true, settlements: true } },
+        },
+      });
+
+      const results = await Promise.all(
+        vendors.map(async (v: any) => {
+          const [earned, paid, deducted, settled] = await Promise.all([
+            tx.vendorOrder.aggregate({
+              _sum: { vendorEarnings: true },
+              where: { vendorId: v.id, status: { in: ["DELIVERED", "SETTLED"] } },
+            }),
+            tx.payout.aggregate({
+              _sum: { amount: true },
+              where: { vendorId: v.id, status: "COMPLETED" },
+            }),
+            tx.deduction.aggregate({
+              _sum: { amount: true },
+              where: { vendorId: v.id, isApplied: true },
+            }),
+            tx.settlement.aggregate({
+              _sum: { amount: true },
+              where: { vendorId: v.id, status: "COMPLETED" },
+            }),
+          ]);
+
+          return {
+            ...v,
+            totalEarned: earned._sum.vendorEarnings || 0,
+            totalPaid: paid._sum.amount || 0,
+            totalDeducted: deducted._sum.amount || 0,
+            totalSettled: settled._sum.amount || 0,
+            balance:
+              (earned._sum.vendorEarnings || 0) -
+              (paid._sum.amount || 0) -
+              (deducted._sum.amount || 0),
+          };
+        })
+      );
+
+      return results;
     });
-
-    const balances = await Promise.all(
-      vendors.map(async (v: any) => {
-        const [earned, paid, deducted, settled] = await Promise.all([
-          prisma.vendorOrder.aggregate({
-            _sum: { vendorEarnings: true },
-            where: { vendorId: v.id, status: { in: ["DELIVERED", "SETTLED"] } },
-          }),
-          prisma.payout.aggregate({
-            _sum: { amount: true },
-            where: { vendorId: v.id, status: "COMPLETED" },
-          }),
-          prisma.deduction.aggregate({
-            _sum: { amount: true },
-            where: { vendorId: v.id, isApplied: true },
-          }),
-          prisma.settlement.aggregate({
-            _sum: { amount: true },
-            where: { vendorId: v.id, status: "COMPLETED" },
-          }),
-        ]);
-
-        return {
-          ...v,
-          totalEarned: earned._sum.vendorEarnings || 0,
-          totalPaid: paid._sum.amount || 0,
-          totalDeducted: deducted._sum.amount || 0,
-          totalSettled: settled._sum.amount || 0,
-          balance:
-            (earned._sum.vendorEarnings || 0) -
-            (paid._sum.amount || 0) -
-            (deducted._sum.amount || 0),
-        };
-      })
-    );
 
     return balances;
   });

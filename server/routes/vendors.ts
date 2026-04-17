@@ -7,10 +7,12 @@
  * - getTenantFilter() for vendor data isolation
  * - canAccessVendor() for detail/sub-resource access
  * - Zod validation on all request bodies
+ * - withRls() for RLS-safe queries on multi-tenant tables
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { requireRole, getTenantFilter, canAccessVendor } from "../middleware/auth.js";
+import { withRls } from "../lib/rls-tx.js";
 import {
   CreateVendorSchema,
   UpdateVendorSchema,
@@ -44,18 +46,23 @@ export async function vendorRoutes(app: FastifyInstance) {
     }
 
     const skip = (query.page - 1) * query.limit;
-    const [vendors, total] = await Promise.all([
-      prisma.vendor.findMany({
-        where,
-        skip,
-        take: query.limit,
-        orderBy: { createdAt: query.sortOrder },
-        include: {
-          _count: { select: { products: true, vendorOrders: true, users: true } },
-        },
-      }),
-      prisma.vendor.count({ where }),
-    ]);
+
+    // Use withRls because _count.products queries the RLS-protected Product table
+    const { vendors, total } = await withRls(prisma, request, async (tx) => {
+      const [vendors, total] = await Promise.all([
+        tx.vendor.findMany({
+          where,
+          skip,
+          take: query.limit,
+          orderBy: { createdAt: query.sortOrder },
+          include: {
+            _count: { select: { products: true, vendorOrders: true, users: true } },
+          },
+        }),
+        tx.vendor.count({ where }),
+      ]);
+      return { vendors, total };
+    });
 
     return {
       vendors,
@@ -76,31 +83,34 @@ export async function vendorRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: "Access denied to this vendor" });
     }
 
-    const vendor = await prisma.vendor.findUnique({
-      where: { id },
-      include: {
-        connectorConfig: true,
-        users: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-            isActive: true,
+    // Use withRls because _count includes RLS-protected tables
+    const vendor = await withRls(prisma, request, async (tx) => {
+      return tx.vendor.findUnique({
+        where: { id },
+        include: {
+          connectorConfig: true,
+          users: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              isActive: true,
+            },
+          },
+          _count: {
+            select: {
+              products: true,
+              vendorOrders: true,
+              shipments: true,
+              returns: true,
+              payouts: true,
+              settlements: true,
+            },
           },
         },
-        _count: {
-          select: {
-            products: true,
-            vendorOrders: true,
-            shipments: true,
-            returns: true,
-            payouts: true,
-            settlements: true,
-          },
-        },
-      },
+      });
     });
 
     if (!vendor) {
@@ -130,7 +140,6 @@ export async function vendorRoutes(app: FastifyInstance) {
 
       const data = parseResult.data;
 
-      // Check slug uniqueness
       const existing = await prisma.vendor.findUnique({
         where: { slug: data.slug },
       });
@@ -138,7 +147,9 @@ export async function vendorRoutes(app: FastifyInstance) {
         return reply.status(409).send({ error: "Vendor slug already exists" });
       }
 
-      const vendor = await prisma.vendor.create({ data });
+      const vendor = await withRls(prisma, request, async (tx) => {
+        return tx.vendor.create({ data });
+      });
       return reply.status(201).send(vendor);
     }
   );
@@ -168,9 +179,11 @@ export async function vendorRoutes(app: FastifyInstance) {
         return reply.status(404).send({ error: "Vendor not found" });
       }
 
-      const updated = await prisma.vendor.update({
-        where: { id },
-        data: parseResult.data,
+      const updated = await withRls(prisma, request, async (tx) => {
+        return tx.vendor.update({
+          where: { id },
+          data: parseResult.data,
+        });
       });
 
       return updated;
@@ -191,9 +204,11 @@ export async function vendorRoutes(app: FastifyInstance) {
         return reply.status(404).send({ error: "Vendor not found" });
       }
 
-      await prisma.vendor.update({
-        where: { id },
-        data: { isActive: false },
+      await withRls(prisma, request, async (tx) => {
+        return tx.vendor.update({
+          where: { id },
+          data: { isActive: false },
+        });
       });
 
       return { success: true, message: "Vendor deactivated" };
@@ -212,10 +227,13 @@ export async function vendorRoutes(app: FastifyInstance) {
         return reply.status(403).send({ error: "Access denied" });
       }
 
-      const metrics = await prisma.vendorPerformance.findMany({
-        where: { vendorId: id },
-        orderBy: { period: "desc" },
-        take: 12,
+      // VendorPerformance has RLS
+      const metrics = await withRls(prisma, request, async (tx) => {
+        return tx.vendorPerformance.findMany({
+          where: { vendorId: id },
+          orderBy: { period: "desc" },
+          take: 12,
+        });
       });
 
       return metrics;
@@ -240,16 +258,21 @@ export async function vendorRoutes(app: FastifyInstance) {
       if (status) where.status = status;
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
-      const [products, total] = await Promise.all([
-        prisma.product.findMany({
-          where,
-          skip,
-          take: parseInt(limit),
-          include: { images: { take: 1 }, variants: true },
-          orderBy: { createdAt: "desc" },
-        }),
-        prisma.product.count({ where }),
-      ]);
+
+      // Product table has RLS — must use withRls
+      const { products, total } = await withRls(prisma, request, async (tx) => {
+        const [products, total] = await Promise.all([
+          tx.product.findMany({
+            where,
+            skip,
+            take: parseInt(limit),
+            include: { images: { take: 1 }, variants: true },
+            orderBy: { createdAt: "desc" },
+          }),
+          tx.product.count({ where }),
+        ]);
+        return { products, total };
+      });
 
       return { products, total };
     }
@@ -273,21 +296,26 @@ export async function vendorRoutes(app: FastifyInstance) {
       if (status) where.status = status;
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
-      const [vendorOrders, total] = await Promise.all([
-        prisma.vendorOrder.findMany({
-          where,
-          skip,
-          take: parseInt(limit),
-          include: {
-            order: true,
-            items: {
-              include: { product: { include: { images: { take: 1 } } } },
+
+      // SubOrder (VendorOrder) has RLS — must use withRls
+      const { vendorOrders, total } = await withRls(prisma, request, async (tx) => {
+        const [vendorOrders, total] = await Promise.all([
+          tx.vendorOrder.findMany({
+            where,
+            skip,
+            take: parseInt(limit),
+            include: {
+              order: true,
+              items: {
+                include: { product: { include: { images: { take: 1 } } } },
+              },
             },
-          },
-          orderBy: { createdAt: "desc" },
-        }),
-        prisma.vendorOrder.count({ where }),
-      ]);
+            orderBy: { createdAt: "desc" },
+          }),
+          tx.vendorOrder.count({ where }),
+        ]);
+        return { vendorOrders, total };
+      });
 
       return { orders: vendorOrders, total };
     }

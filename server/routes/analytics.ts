@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { withRls } from "../lib/rls-tx.js";
 
 export async function analyticsRoutes(app: FastifyInstance) {
   const prisma = (app as any).prisma;
@@ -10,6 +11,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
+    // MarketplaceOrder doesn't have RLS, but keep consistent
     const orders = await prisma.marketplaceOrder.findMany({
       where: { placedAt: { gte: startDate } },
       select: { placedAt: true, totalAmount: true, status: true },
@@ -33,83 +35,98 @@ export async function analyticsRoutes(app: FastifyInstance) {
   });
 
   // GET /api/analytics/vendors
-  app.get("/vendors", async () => {
-    const vendors = await prisma.vendor.findMany({
-      where: { isActive: true },
-      select: {
-        id: true, name: true, location: true, economicModel: true,
-        _count: { select: { products: true, vendorOrders: true, returns: true } },
-      },
+  app.get("/vendors", async (request) => {
+    // VendorOrder, Return, Product all have RLS
+    const vendorStats = await withRls(prisma, request, async (tx) => {
+      const vendors = await tx.vendor.findMany({
+        where: { isActive: true },
+        select: {
+          id: true, name: true, location: true, economicModel: true,
+          _count: { select: { products: true, vendorOrders: true, returns: true } },
+        },
+      });
+
+      const results = await Promise.all(
+        vendors.map(async (v: any) => {
+          const [revenue, returns] = await Promise.all([
+            tx.vendorOrder.aggregate({
+              _sum: { subtotal: true, commission: true },
+              where: { vendorId: v.id },
+            }),
+            tx.return.count({ where: { vendorId: v.id } }),
+          ]);
+
+          const returnRate = v._count.vendorOrders > 0
+            ? (returns / v._count.vendorOrders) * 100
+            : 0;
+
+          return {
+            ...v,
+            revenue: revenue._sum.subtotal || 0,
+            commission: revenue._sum.commission || 0,
+            returnRate: Math.round(returnRate * 10) / 10,
+          };
+        })
+      );
+
+      return results;
     });
-
-    const vendorStats = await Promise.all(
-      vendors.map(async (v: any) => {
-        const [revenue, returns] = await Promise.all([
-          prisma.vendorOrder.aggregate({
-            _sum: { subtotal: true, commission: true },
-            where: { vendorId: v.id },
-          }),
-          prisma.return.count({ where: { vendorId: v.id } }),
-        ]);
-
-        const returnRate = v._count.vendorOrders > 0
-          ? (returns / v._count.vendorOrders) * 100
-          : 0;
-
-        return {
-          ...v,
-          revenue: revenue._sum.subtotal || 0,
-          commission: revenue._sum.commission || 0,
-          returnRate: Math.round(returnRate * 10) / 10,
-        };
-      })
-    );
 
     return vendorStats;
   });
 
   // GET /api/analytics/shipping
-  app.get("/shipping", async () => {
-    const byCarrier = await prisma.shipment.groupBy({
-      by: ["carrier"],
-      _count: true,
-      _sum: { shippingCost: true },
+  app.get("/shipping", async (request) => {
+    // Shipment has RLS
+    const result = await withRls(prisma, request, async (tx) => {
+      const byCarrier = await tx.shipment.groupBy({
+        by: ["carrier"],
+        _count: true,
+        _sum: { shippingCost: true },
+      });
+
+      const byStatus = await tx.shipment.groupBy({
+        by: ["status"],
+        _count: true,
+      });
+
+      const avgDeliveryTime = await tx.shipment.aggregate({
+        _avg: { shippingCost: true },
+      });
+
+      return { byCarrier, byStatus, avgShippingCost: avgDeliveryTime._avg.shippingCost || 0 };
     });
 
-    const byStatus = await prisma.shipment.groupBy({
-      by: ["status"],
-      _count: true,
-    });
-
-    const avgDeliveryTime = await prisma.shipment.aggregate({
-      _avg: { shippingCost: true },
-    });
-
-    return { byCarrier, byStatus, avgShippingCost: avgDeliveryTime._avg.shippingCost || 0 };
+    return result;
   });
 
   // GET /api/analytics/catalog
-  app.get("/catalog", async () => {
-    const byStatus = await prisma.product.groupBy({
-      by: ["status"],
-      _count: true,
-      where: { isDeleted: false },
+  app.get("/catalog", async (request) => {
+    // Product has RLS
+    const result = await withRls(prisma, request, async (tx) => {
+      const byStatus = await tx.product.groupBy({
+        by: ["status"],
+        _count: true,
+        where: { isDeleted: false },
+      });
+
+      const byCategory = await tx.product.groupBy({
+        by: ["category"],
+        _count: true,
+        where: { isDeleted: false, category: { not: null } },
+        orderBy: { _count: { category: "desc" } },
+        take: 15,
+      });
+
+      const enrichmentDist = await tx.product.groupBy({
+        by: ["enrichmentScore"],
+        _count: true,
+        where: { isDeleted: false },
+      });
+
+      return { byStatus, byCategory, enrichmentDist };
     });
 
-    const byCategory = await prisma.product.groupBy({
-      by: ["category"],
-      _count: true,
-      where: { isDeleted: false, category: { not: null } },
-      orderBy: { _count: { category: "desc" } },
-      take: 15,
-    });
-
-    const enrichmentDist = await prisma.product.groupBy({
-      by: ["enrichmentScore"],
-      _count: true,
-      where: { isDeleted: false },
-    });
-
-    return { byStatus, byCategory, enrichmentDist };
+    return result;
   });
 }

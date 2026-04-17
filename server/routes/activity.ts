@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { withRls } from "../lib/rls-tx.js";
 
 interface ActivityEntry {
   id: string;
@@ -14,69 +15,53 @@ interface ActivityEntry {
 }
 
 export async function activityRoutes(app: FastifyInstance) {
+  const prisma = (app as any).prisma;
+
   // GET /api/activity
   app.get("/", async (request) => {
     const { limit = "50", page = "1" } = request.query as any;
     const take = parseInt(limit);
     const skip = (parseInt(page) - 1) * take;
-    const role = (request as any).authUser?.role || "RETAILER_LT";
 
-    // Synthesize activity from real database events using $transaction for RLS
-    const prisma = (app as any).prisma;
-    const activities: ActivityEntry[] = await prisma.$transaction(async (tx: any) => {
-      await tx.$executeRaw`SELECT set_config('app.current_user_role', ${role}, true)`;
-
+    // Synthesize activity from real database events
+    const activities: ActivityEntry[] = await withRls(prisma, request, async (tx) => {
       const [recentOrders, recentShipments, recentPayouts, recentReturns, recentProducts] =
         await Promise.all([
           tx.marketplaceOrder.findMany({
             take: 15,
             orderBy: { createdAt: "desc" },
             select: {
-              id: true,
-              orderNumber: true,
-              status: true,
-              totalAmount: true,
-              createdAt: true,
-              updatedAt: true,
+              id: true, orderNumber: true, status: true,
+              totalAmount: true, createdAt: true, updatedAt: true,
             },
           }),
           tx.shipment.findMany({
             take: 10,
             orderBy: { createdAt: "desc" },
-            include: {
-              vendor: { select: { name: true } },
-            },
+            include: { vendor: { select: { name: true } } },
           }),
           tx.payout.findMany({
             take: 10,
             orderBy: { createdAt: "desc" },
-            include: {
-              vendor: { select: { name: true } },
-            },
+            include: { vendor: { select: { name: true } } },
           }),
           tx.return.findMany({
             take: 10,
             orderBy: { createdAt: "desc" },
-            include: {
-              vendor: { select: { name: true } },
-            },
+            include: { vendor: { select: { name: true } } },
           }),
           tx.product.findMany({
             take: 10,
             orderBy: { updatedAt: "desc" },
             select: {
-              id: true,
-              title: true,
-              status: true,
-              createdAt: true,
-              updatedAt: true,
+              id: true, title: true, status: true,
+              createdAt: true, updatedAt: true,
             },
           }),
         ]);
 
       const entries: ActivityEntry[] = [];
 
-      // Order events
       for (const o of recentOrders) {
         const statusMap: Record<string, { title: string; severity: string }> = {
           PLACED: { title: "New order received", severity: "info" },
@@ -95,14 +80,13 @@ export async function activityRoutes(app: FastifyInstance) {
           severity: info.severity,
           title: info.title,
           description: `Order ${o.orderNumber} — $${(o.totalAmount || 0).toLocaleString()}. Status: ${o.status}.`,
-          actor: "System",
+          actor: "Order Pipeline",
           entityType: "order",
           entityId: o.id,
           entityLabel: o.orderNumber,
         });
       }
 
-      // Shipment events
       for (const s of recentShipments) {
         const statusMap: Record<string, { title: string; severity: string }> = {
           PENDING: { title: "Shipment created", severity: "info" },
@@ -119,14 +103,13 @@ export async function activityRoutes(app: FastifyInstance) {
           severity: info.severity,
           title: info.title,
           description: `${s.carrier || "Unknown carrier"} — Tracking: ${s.trackingNumber || "N/A"}. Vendor: ${s.vendor?.name || "Unknown"}.`,
-          actor: "System",
+          actor: "Shipping Service",
           entityType: "shipment",
           entityId: s.id,
           entityLabel: s.trackingNumber || s.id.slice(-8),
         });
       }
 
-      // Payout events
       for (const p of recentPayouts) {
         const statusMap: Record<string, { title: string; severity: string }> = {
           PENDING: { title: "Payout scheduled", severity: "info" },
@@ -149,7 +132,6 @@ export async function activityRoutes(app: FastifyInstance) {
         });
       }
 
-      // Return events
       for (const r of recentReturns) {
         const statusMap: Record<string, { title: string; severity: string }> = {
           INITIATED: { title: "Return initiated", severity: "warning" },
@@ -166,14 +148,13 @@ export async function activityRoutes(app: FastifyInstance) {
           severity: info.severity,
           title: info.title,
           description: `Vendor: ${r.vendor?.name || "Unknown"}. Reason: ${r.reason || "Not specified"}. Refund: $${(r.refundAmount || 0).toLocaleString()}.`,
-          actor: "System",
+          actor: "Returns Handler",
           entityType: "order",
           entityId: r.id,
           entityLabel: `RET-${r.id.slice(-6).toUpperCase()}`,
         });
       }
 
-      // Product events
       for (const p of recentProducts) {
         const statusMap: Record<string, { title: string; severity: string }> = {
           PENDING_REVIEW: { title: "Product pending review", severity: "info" },
@@ -189,20 +170,17 @@ export async function activityRoutes(app: FastifyInstance) {
           severity: info.severity,
           title: info.title,
           description: `${p.title || "Untitled product"}. Status: ${p.status}.`,
-          actor: "System",
+          actor: "Catalog Service",
           entityType: "product",
           entityId: p.id,
           entityLabel: p.title?.slice(0, 30) || p.id.slice(-8),
         });
       }
 
-      // Sort all entries by timestamp descending
       entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
       return entries;
     });
 
-    // Paginate
     const total = activities.length;
     const paginated = activities.slice(skip, skip + take);
 

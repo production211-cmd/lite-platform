@@ -1,31 +1,13 @@
 import { FastifyInstance } from "fastify";
+import { withRls } from "../lib/rls-tx.js";
 
 export async function dashboardRoutes(app: FastifyInstance) {
   const prisma = (app as any).prisma;
-
-  /**
-   * Helper: set RLS context inside a transaction. Fail-closed: if no authUser,
-   * set a sentinel role that matches no RLS policy rows.
-   */
-  async function setRlsContext(tx: any, request: any) {
-    const user = (request as any).authUser;
-    const role = user?.role || 'NONE';
-    const vendorId = user?.vendorId || '__NONE__';
-    await tx.$executeRawUnsafe(
-      `SELECT set_config('app.current_user_role', $1, true)`,
-      role
-    );
-    await tx.$executeRawUnsafe(
-      `SELECT set_config('app.current_vendor_id', $1, true)`,
-      vendorId
-    );
-  }
 
   // GET /api/dashboard/kpis
   app.get("/kpis", async (request) => {
     const { range } = request.query as { range?: string };
 
-    // Build date filter for time-scoped metrics
     const now = new Date();
     let dateFrom: Date | undefined;
     if (range === "today") {
@@ -39,10 +21,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     const dateFilter = dateFrom ? { placedAt: { gte: dateFrom } } : {};
 
-    // Use interactive transaction to ensure RLS context is on the same connection
-    return prisma.$transaction(async (tx: any) => {
-      await setRlsContext(tx, request);
-
+    return withRls(prisma, request, async (tx) => {
       const [
         totalOrders, totalProducts, totalVendors, activeVendors,
         totalRevenue, totalShipments, totalReturns, pendingReview,
@@ -60,10 +39,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
         tx.product.count({ where: { status: "PENDING_REVIEW" } }),
       ]);
 
-      // Commission earned
       const commissions = await tx.vendorOrder.aggregate({ _sum: { commission: true } });
 
-      // Orders needing action
       const [
         fraudHold, pendingAcceptance, pendingShipment,
         inTransit, exceptions, openMessages, pendingPayouts,
@@ -85,7 +62,6 @@ export async function dashboardRoutes(app: FastifyInstance) {
         tx.product.count({ where: { complianceRisk: "HIGH", isDeleted: false } }),
       ]);
 
-      // Order status breakdown
       const orderStatuses = await tx.marketplaceOrder.groupBy({
         by: ["status"],
         _count: true,
@@ -96,7 +72,6 @@ export async function dashboardRoutes(app: FastifyInstance) {
         statusBreakdown[s.status] = s._count;
       });
 
-      // Date-scoped sub-metrics (today, week, month)
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const weekStart = new Date(now);
       weekStart.setDate(weekStart.getDate() - 7);
@@ -131,15 +106,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
         totalReturns,
         pendingReview,
         actionRequired: {
-          fraudHold,
-          pendingAcceptance,
-          pendingShipment,
-          inTransit,
-          exceptions,
-          openMessages,
-          pendingPayouts,
-          stockOuts,
-          complianceIssues,
+          fraudHold, pendingAcceptance, pendingShipment,
+          inTransit, exceptions, openMessages, pendingPayouts,
+          stockOuts, complianceIssues,
         },
         statusBreakdown,
         periodMetrics: {
@@ -153,10 +122,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
   // GET /api/dashboard/recent-orders
   app.get("/recent-orders", async (request) => {
-    return prisma.$transaction(async (tx: any) => {
-      await setRlsContext(tx, request);
-
-      const orders = await tx.marketplaceOrder.findMany({
+    return withRls(prisma, request, async (tx) => {
+      return tx.marketplaceOrder.findMany({
         take: 10,
         orderBy: { placedAt: "desc" },
         include: {
@@ -172,25 +139,17 @@ export async function dashboardRoutes(app: FastifyInstance) {
           },
         },
       });
-      return orders;
     });
   });
 
   // GET /api/dashboard/top-vendors
   app.get("/top-vendors", async (request) => {
-    return prisma.$transaction(async (tx: any) => {
-      await setRlsContext(tx, request);
-
+    return withRls(prisma, request, async (tx) => {
       const vendors = await tx.vendor.findMany({
         where: { isActive: true },
         select: {
-          id: true,
-          name: true,
-          slug: true,
-          location: true,
-          country: true,
-          economicModel: true,
-          logoUrl: true,
+          id: true, name: true, slug: true, location: true, country: true,
+          economicModel: true, logoUrl: true,
           _count: { select: { products: true, vendorOrders: true } },
         },
         take: 12,
@@ -212,9 +171,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
   // GET /api/dashboard/revenue-chart
   app.get("/revenue-chart", async (request) => {
-    return prisma.$transaction(async (tx: any) => {
-      await setRlsContext(tx, request);
-
+    return withRls(prisma, request, async (tx) => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -239,9 +196,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
   // GET /api/dashboard/order-status-breakdown
   app.get("/order-status-breakdown", async (request) => {
-    return prisma.$transaction(async (tx: any) => {
-      await setRlsContext(tx, request);
-
+    return withRls(prisma, request, async (tx) => {
       const statuses = await tx.marketplaceOrder.groupBy({
         by: ["status"],
         _count: true,

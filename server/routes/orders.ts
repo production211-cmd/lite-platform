@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { withRls } from "../lib/rls-tx.js";
 
 export async function orderRoutes(app: FastifyInstance) {
   const prisma = (app as any).prisma;
@@ -26,34 +27,40 @@ export async function orderRoutes(app: FastifyInstance) {
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [orders, total] = await Promise.all([
-      prisma.marketplaceOrder.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        include: {
-          vendorOrders: {
-            include: {
-              vendor: { select: { id: true, name: true, slug: true } },
-              items: {
-                include: {
-                  product: { select: { id: true, title: true, images: { take: 1 } } },
+
+    // vendorOrders, product, shipments, returns are all RLS-protected
+    const { orders, total } = await withRls(prisma, request, async (tx) => {
+      const [orders, total] = await Promise.all([
+        tx.marketplaceOrder.findMany({
+          where,
+          skip,
+          take: parseInt(limit),
+          include: {
+            vendorOrders: {
+              include: {
+                vendor: { select: { id: true, name: true, slug: true } },
+                items: {
+                  include: {
+                    product: { select: { id: true, title: true, images: { take: 1 } } },
+                  },
                 },
+                _count: { select: { shipments: true, returns: true } },
               },
-              _count: { select: { shipments: true, returns: true } },
             },
           },
-        },
-        orderBy: { [sortBy]: sortOrder },
-      }),
-      prisma.marketplaceOrder.count({ where }),
-    ]);
+          orderBy: { [sortBy]: sortOrder },
+        }),
+        tx.marketplaceOrder.count({ where }),
+      ]);
+      return { orders, total };
+    });
 
     return { orders, total, page: parseInt(page), limit: parseInt(limit) };
   });
 
   // GET /api/orders/stats
-  app.get("/stats", async () => {
+  app.get("/stats", async (request) => {
+    // MarketplaceOrder itself doesn't have RLS, but wrapping for consistency
     const [total, placed, fraudHold, pendingAccept, shipped, inTransit, delivered, cancelled] =
       await Promise.all([
         prisma.marketplaceOrder.count(),
@@ -84,20 +91,25 @@ export async function orderRoutes(app: FastifyInstance) {
     if (vendorId) where.vendorId = vendorId;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [vendorOrders, total] = await Promise.all([
-      prisma.vendorOrder.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        include: {
-          order: true,
-          vendor: { select: { id: true, name: true } },
-          items: { include: { product: { include: { images: { take: 1 } } } } },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.vendorOrder.count({ where }),
-    ]);
+
+    // VendorOrder (SubOrder) has RLS
+    const { vendorOrders, total } = await withRls(prisma, request, async (tx) => {
+      const [vendorOrders, total] = await Promise.all([
+        tx.vendorOrder.findMany({
+          where,
+          skip,
+          take: parseInt(limit),
+          include: {
+            order: true,
+            vendor: { select: { id: true, name: true } },
+            items: { include: { product: { include: { images: { take: 1 } } } } },
+          },
+          orderBy: { createdAt: "desc" },
+        }),
+        tx.vendorOrder.count({ where }),
+      ]);
+      return { vendorOrders, total };
+    });
 
     return { orders: vendorOrders, total };
   });
@@ -105,26 +117,31 @@ export async function orderRoutes(app: FastifyInstance) {
   // GET /api/orders/:id
   app.get("/:id", async (request) => {
     const { id } = request.params as { id: string };
-    const order = await prisma.marketplaceOrder.findUnique({
-      where: { id },
-      include: {
-        vendorOrders: {
-          include: {
-            vendor: true,
-            items: {
-              include: {
-                product: { include: { images: { take: 1 } } },
-                variant: true,
+
+    // Includes vendorOrders, product, shipments, returns, settlements — all RLS-protected
+    const order = await withRls(prisma, request, async (tx) => {
+      return tx.marketplaceOrder.findUnique({
+        where: { id },
+        include: {
+          vendorOrders: {
+            include: {
+              vendor: true,
+              items: {
+                include: {
+                  product: { include: { images: { take: 1 } } },
+                  variant: true,
+                },
               },
+              shipments: { include: { trackingEvents: { orderBy: { timestamp: "desc" } } } },
+              returns: true,
+              settlements: true,
             },
-            shipments: { include: { trackingEvents: { orderBy: { timestamp: "desc" } } } },
-            returns: true,
-            settlements: true,
           },
+          priceSnapshot: true,
         },
-        priceSnapshot: true,
-      },
+      });
     });
+
     if (!order) return { error: "Order not found" };
     return order;
   });
@@ -132,9 +149,12 @@ export async function orderRoutes(app: FastifyInstance) {
   // POST /api/orders/:vendorOrderId/accept
   app.post("/:vendorOrderId/accept", async (request) => {
     const { vendorOrderId } = request.params as { vendorOrderId: string };
-    const vendorOrder = await prisma.vendorOrder.update({
-      where: { id: vendorOrderId },
-      data: { status: "VENDOR_ACCEPT", acceptedAt: new Date() },
+
+    const vendorOrder = await withRls(prisma, request, async (tx) => {
+      return tx.vendorOrder.update({
+        where: { id: vendorOrderId },
+        data: { status: "VENDOR_ACCEPT", acceptedAt: new Date() },
+      });
     });
     return vendorOrder;
   });
@@ -143,13 +163,16 @@ export async function orderRoutes(app: FastifyInstance) {
   app.post("/:vendorOrderId/reject", async (request) => {
     const { vendorOrderId } = request.params as { vendorOrderId: string };
     const { reason } = request.body as { reason: string };
-    const vendorOrder = await prisma.vendorOrder.update({
-      where: { id: vendorOrderId },
-      data: {
-        status: "VENDOR_REJECTED",
-        rejectedAt: new Date(),
-        rejectionReason: reason,
-      },
+
+    const vendorOrder = await withRls(prisma, request, async (tx) => {
+      return tx.vendorOrder.update({
+        where: { id: vendorOrderId },
+        data: {
+          status: "VENDOR_REJECTED",
+          rejectedAt: new Date(),
+          rejectionReason: reason,
+        },
+      });
     });
     return vendorOrder;
   });

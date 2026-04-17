@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { withRls } from "../lib/rls-tx.js";
 
 export async function messageRoutes(app: FastifyInstance) {
   const prisma = (app as any).prisma;
@@ -18,21 +19,26 @@ export async function messageRoutes(app: FastifyInstance) {
     if (assignedToId) where.assignedToId = assignedToId;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [threads, total] = await Promise.all([
-      prisma.messageThread.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        include: {
-          vendor: { select: { id: true, name: true } },
-          assignedTo: { select: { id: true, firstName: true, lastName: true } },
-          messages: { orderBy: { createdAt: "desc" }, take: 1 },
-          _count: { select: { messages: true } },
-        },
-        orderBy: { updatedAt: "desc" },
-      }),
-      prisma.messageThread.count({ where }),
-    ]);
+
+    // MessageThread has RLS
+    const { threads, total } = await withRls(prisma, request, async (tx) => {
+      const [threads, total] = await Promise.all([
+        tx.messageThread.findMany({
+          where,
+          skip,
+          take: parseInt(limit),
+          include: {
+            vendor: { select: { id: true, name: true } },
+            assignedTo: { select: { id: true, firstName: true, lastName: true } },
+            messages: { orderBy: { createdAt: "desc" }, take: 1 },
+            _count: { select: { messages: true } },
+          },
+          orderBy: { updatedAt: "desc" },
+        }),
+        tx.messageThread.count({ where }),
+      ]);
+      return { threads, total };
+    });
 
     return { threads, total };
   });
@@ -40,17 +46,21 @@ export async function messageRoutes(app: FastifyInstance) {
   // GET /api/messages/threads/:id
   app.get("/threads/:id", async (request) => {
     const { id } = request.params as { id: string };
-    const thread = await prisma.messageThread.findUnique({
-      where: { id },
-      include: {
-        vendor: true,
-        assignedTo: { select: { id: true, firstName: true, lastName: true } },
-        messages: {
-          include: { sender: { select: { id: true, firstName: true, lastName: true, role: true } } },
-          orderBy: { createdAt: "asc" },
+
+    const thread = await withRls(prisma, request, async (tx) => {
+      return tx.messageThread.findUnique({
+        where: { id },
+        include: {
+          vendor: true,
+          assignedTo: { select: { id: true, firstName: true, lastName: true } },
+          messages: {
+            include: { sender: { select: { id: true, firstName: true, lastName: true, role: true } } },
+            orderBy: { createdAt: "asc" },
+          },
         },
-      },
+      });
     });
+
     if (!thread) return { error: "Thread not found" };
     return thread;
   });
@@ -58,11 +68,14 @@ export async function messageRoutes(app: FastifyInstance) {
   // POST /api/messages/threads
   app.post("/threads", async (request) => {
     const data = request.body as any;
-    const thread = await prisma.messageThread.create({
-      data: {
-        ...data,
-        slaDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h SLA
-      },
+
+    const thread = await withRls(prisma, request, async (tx) => {
+      return tx.messageThread.create({
+        data: {
+          ...data,
+          slaDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
     });
     return thread;
   });
@@ -72,14 +85,15 @@ export async function messageRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const { senderId, content, isInternal } = request.body as any;
 
-    const message = await prisma.message.create({
-      data: { threadId: id, senderId, content, isInternal: isInternal || false },
-    });
-
-    // Update thread timestamp
-    await prisma.messageThread.update({
-      where: { id },
-      data: { updatedAt: new Date() },
+    const message = await withRls(prisma, request, async (tx) => {
+      const msg = await tx.message.create({
+        data: { threadId: id, senderId, content, isInternal: isInternal || false },
+      });
+      await tx.messageThread.update({
+        where: { id },
+        data: { updatedAt: new Date() },
+      });
+      return msg;
     });
 
     return message;
@@ -89,9 +103,12 @@ export async function messageRoutes(app: FastifyInstance) {
   app.put("/threads/:id/assign", async (request) => {
     const { id } = request.params as { id: string };
     const { assignedToId } = request.body as { assignedToId: string };
-    const thread = await prisma.messageThread.update({
-      where: { id },
-      data: { assignedToId },
+
+    const thread = await withRls(prisma, request, async (tx) => {
+      return tx.messageThread.update({
+        where: { id },
+        data: { assignedToId },
+      });
     });
     return thread;
   });
@@ -104,28 +121,33 @@ export async function messageRoutes(app: FastifyInstance) {
     if (status === "RESOLVED") data.resolvedAt = new Date();
     if (status === "CLOSED") data.closedAt = new Date();
 
-    const thread = await prisma.messageThread.update({ where: { id }, data });
+    const thread = await withRls(prisma, request, async (tx) => {
+      return tx.messageThread.update({ where: { id }, data });
+    });
     return thread;
   });
 
   // GET /api/messages/stats
-  app.get("/stats", async () => {
-    const [total, open, pending, resolved, urgent] = await Promise.all([
-      prisma.messageThread.count(),
-      prisma.messageThread.count({ where: { status: "OPEN" } }),
-      prisma.messageThread.count({ where: { status: "PENDING" } }),
-      prisma.messageThread.count({ where: { status: "RESOLVED" } }),
-      prisma.messageThread.count({ where: { priority: "URGENT" } }),
-    ]);
+  app.get("/stats", async (request) => {
+    const result = await withRls(prisma, request, async (tx) => {
+      const [total, open, pending, resolved, urgent] = await Promise.all([
+        tx.messageThread.count(),
+        tx.messageThread.count({ where: { status: "OPEN" } }),
+        tx.messageThread.count({ where: { status: "PENDING" } }),
+        tx.messageThread.count({ where: { status: "RESOLVED" } }),
+        tx.messageThread.count({ where: { priority: "URGENT" } }),
+      ]);
 
-    // SLA breaches
-    const slaBreach = await prisma.messageThread.count({
-      where: {
-        status: { in: ["OPEN", "PENDING"] },
-        slaDeadline: { lt: new Date() },
-      },
+      const slaBreach = await tx.messageThread.count({
+        where: {
+          status: { in: ["OPEN", "PENDING"] },
+          slaDeadline: { lt: new Date() },
+        },
+      });
+
+      return { total, open, pending, resolved, urgent, slaBreach };
     });
 
-    return { total, open, pending, resolved, urgent, slaBreach };
+    return result;
   });
 }

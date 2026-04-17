@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { withRls } from "../lib/rls-tx.js";
 
 export async function shipmentRoutes(app: FastifyInstance) {
   const prisma = (app as any).prisma;
@@ -16,65 +17,78 @@ export async function shipmentRoutes(app: FastifyInstance) {
     if (leg) where.leg = leg;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [shipments, total] = await Promise.all([
-      prisma.shipment.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        include: {
-          vendor: { select: { id: true, name: true } },
-          vendorOrder: {
-            include: {
-              order: { select: { id: true, orderNumber: true, customerName: true } },
-              items: { include: { product: { select: { id: true, title: true } } } },
+
+    // Shipment has RLS, and includes vendorOrder (SubOrder) + product — both RLS-protected
+    const { shipments, total } = await withRls(prisma, request, async (tx) => {
+      const [shipments, total] = await Promise.all([
+        tx.shipment.findMany({
+          where,
+          skip,
+          take: parseInt(limit),
+          include: {
+            vendor: { select: { id: true, name: true } },
+            vendorOrder: {
+              include: {
+                order: { select: { id: true, orderNumber: true, customerName: true } },
+                items: { include: { product: { select: { id: true, title: true } } } },
+              },
             },
+            trackingEvents: { orderBy: { timestamp: "desc" }, take: 5 },
+            childShipments: true,
           },
-          trackingEvents: { orderBy: { timestamp: "desc" }, take: 5 },
-          childShipments: true,
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.shipment.count({ where }),
-    ]);
+          orderBy: { createdAt: "desc" },
+        }),
+        tx.shipment.count({ where }),
+      ]);
+      return { shipments, total };
+    });
 
     return { shipments, total, page: parseInt(page), limit: parseInt(limit) };
   });
 
   // GET /api/shipments/stats
-  app.get("/stats", async () => {
-    const [total, labelCreated, inTransit, delivered, exceptions] = await Promise.all([
-      prisma.shipment.count(),
-      prisma.shipment.count({ where: { status: "LABEL_CREATED" } }),
-      prisma.shipment.count({ where: { status: "IN_TRANSIT" } }),
-      prisma.shipment.count({ where: { status: "DELIVERED" } }),
-      prisma.shipment.count({ where: { status: "EXCEPTION" } }),
-    ]);
+  app.get("/stats", async (request) => {
+    const result = await withRls(prisma, request, async (tx) => {
+      const [total, labelCreated, inTransit, delivered, exceptions] = await Promise.all([
+        tx.shipment.count(),
+        tx.shipment.count({ where: { status: "LABEL_CREATED" } }),
+        tx.shipment.count({ where: { status: "IN_TRANSIT" } }),
+        tx.shipment.count({ where: { status: "DELIVERED" } }),
+        tx.shipment.count({ where: { status: "EXCEPTION" } }),
+      ]);
 
-    const costs = await prisma.shipment.aggregate({
-      _sum: { shippingCost: true },
+      const costs = await tx.shipment.aggregate({
+        _sum: { shippingCost: true },
+      });
+
+      return { total, labelCreated, inTransit, delivered, exceptions, totalCost: costs._sum.shippingCost || 0 };
     });
 
-    return { total, labelCreated, inTransit, delivered, exceptions, totalCost: costs._sum.shippingCost || 0 };
+    return result;
   });
 
   // GET /api/shipments/:id
   app.get("/:id", async (request) => {
     const { id } = request.params as { id: string };
-    const shipment = await prisma.shipment.findUnique({
-      where: { id },
-      include: {
-        vendor: true,
-        vendorOrder: {
-          include: {
-            order: true,
-            items: { include: { product: { include: { images: { take: 1 } } }, variant: true } },
+
+    const shipment = await withRls(prisma, request, async (tx) => {
+      return tx.shipment.findUnique({
+        where: { id },
+        include: {
+          vendor: true,
+          vendorOrder: {
+            include: {
+              order: true,
+              items: { include: { product: { include: { images: { take: 1 } } }, variant: true } },
+            },
           },
+          trackingEvents: { orderBy: { timestamp: "desc" } },
+          childShipments: { include: { trackingEvents: { orderBy: { timestamp: "desc" } } } },
+          parentShipment: true,
         },
-        trackingEvents: { orderBy: { timestamp: "desc" } },
-        childShipments: { include: { trackingEvents: { orderBy: { timestamp: "desc" } } } },
-        parentShipment: true,
-      },
+      });
     });
+
     if (!shipment) return { error: "Shipment not found" };
     return shipment;
   });
@@ -82,27 +96,34 @@ export async function shipmentRoutes(app: FastifyInstance) {
   // POST /api/shipments
   app.post("/", async (request) => {
     const data = request.body as any;
-    const shipment = await prisma.shipment.create({ data });
+
+    const shipment = await withRls(prisma, request, async (tx) => {
+      return tx.shipment.create({ data });
+    });
     return shipment;
   });
 
   // PUT /api/shipments/:id/void
   app.put("/:id/void", async (request) => {
     const { id } = request.params as { id: string };
-    const shipment = await prisma.shipment.update({
-      where: { id },
-      data: { status: "LABEL_VOIDED", labelVoidedAt: new Date() },
+
+    const shipment = await withRls(prisma, request, async (tx) => {
+      const updated = await tx.shipment.update({
+        where: { id },
+        data: { status: "LABEL_VOIDED", labelVoidedAt: new Date() },
+      });
+      await tx.labelGenerationLog.create({
+        data: {
+          shipmentId: id,
+          vendorOrderId: updated.vendorOrderId,
+          trackingNumber: updated.trackingNumber,
+          action: "voided",
+          carrier: updated.carrier,
+        },
+      });
+      return updated;
     });
-    // Log the void using typed LabelGenerationLog
-    await prisma.labelGenerationLog.create({
-      data: {
-        shipmentId: id,
-        vendorOrderId: shipment.vendorOrderId,
-        trackingNumber: shipment.trackingNumber,
-        action: "voided",
-        carrier: shipment.carrier,
-      },
-    });
+
     return shipment;
   });
 }
