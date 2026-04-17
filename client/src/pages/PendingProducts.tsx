@@ -52,7 +52,7 @@ export default function PendingProducts() {
     <div>
       <TopBar title="Pending Review" subtitle={`${total} products awaiting approval`} />
 
-      <div className="p-6 space-y-6 animate-fade-in">
+      <div className="p-6 space-y-6 page-enter">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-slate-200 border-t-[#c8a45c] rounded-full animate-spin" />

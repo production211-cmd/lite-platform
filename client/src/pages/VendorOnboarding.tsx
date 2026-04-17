@@ -184,7 +184,7 @@ export default function VendorOnboarding() {
   };
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-xs font-body text-gray-400">
         <Link href="/vendors" className="hover:text-gray-600 transition-colors">Vendors</Link>

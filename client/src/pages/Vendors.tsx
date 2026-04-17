@@ -75,7 +75,7 @@ export default function Vendors() {
   }
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       {/* Page Header */}
       <div className="flex items-start justify-between">
         <div className="page-header">
@@ -90,19 +90,19 @@ export default function Vendors() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-4 gap-3">
-        <div className="quick-stat">
+        <div className="quick-stat card-hover">
           <p className="stat-number">{vendors.length}</p>
           <p className="stat-label">Total Vendors</p>
         </div>
-        <div className="quick-stat">
+        <div className="quick-stat card-hover">
           <p className="stat-number">{vendors.filter((v) => v.location === "DOMESTIC_US").length}</p>
           <p className="stat-label">Domestic (US)</p>
         </div>
-        <div className="quick-stat">
+        <div className="quick-stat card-hover">
           <p className="stat-number">{vendors.filter((v) => v.location === "INTERNATIONAL").length}</p>
           <p className="stat-label">International</p>
         </div>
-        <div className="quick-stat">
+        <div className="quick-stat card-hover">
           <p className="stat-number">{tabCounts.MARKETPLACE} / {tabCounts.WHOLESALE}</p>
           <p className="stat-label">Marketplace / Wholesale</p>
         </div>
@@ -211,7 +211,7 @@ export default function Vendors() {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-soft">
           <table className="data-table">
             <thead>
               <tr>

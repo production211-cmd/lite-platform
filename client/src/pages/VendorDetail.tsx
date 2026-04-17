@@ -65,14 +65,14 @@ export default function VendorDetail() {
   const access = vendor.vendorAccess?.[0] || {};
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       {/* Back */}
       <Link href="/vendors" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 font-body">
         <ArrowLeft size={16} /> Back to Vendors
       </Link>
 
       {/* Vendor Header */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center text-xl font-bold font-heading text-gray-400">
@@ -152,7 +152,7 @@ export default function VendorDetail() {
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-4">
             {/* Contact & Business */}
-            <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-5">
               <h3 className="text-sm font-bold font-heading mb-3">Business Details</h3>
               <div className="space-y-2.5">
                 {[
@@ -173,7 +173,7 @@ export default function VendorDetail() {
             </div>
 
             {/* Performance */}
-            <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-5">
               <h3 className="text-sm font-bold font-heading mb-3">Performance Metrics</h3>
               <div className="space-y-3">
                 {[
@@ -200,7 +200,7 @@ export default function VendorDetail() {
           </div>
 
           {/* Commission & Terms */}
-          <div className="bg-white rounded-lg border border-gray-200 p-5">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-5">
             <h3 className="text-sm font-bold font-heading mb-3">Commission & Terms</h3>
             <div className="grid grid-cols-4 gap-6">
               <div>
@@ -225,7 +225,7 @@ export default function VendorDetail() {
       )}
 
       {activeTab === "orders" && (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-8 text-center text-gray-400">
           <ShoppingCart size={32} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm font-body">Vendor orders will be displayed here</p>
           <p className="text-xs font-body mt-1">Filtered view of all orders for {vendor.name}</p>
@@ -233,7 +233,7 @@ export default function VendorDetail() {
       )}
 
       {activeTab === "products" && (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-8 text-center text-gray-400">
           <Package size={32} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm font-body">Vendor products will be displayed here</p>
           <p className="text-xs font-body mt-1">Filtered view of all products from {vendor.name}</p>
@@ -241,7 +241,7 @@ export default function VendorDetail() {
       )}
 
       {activeTab === "finance" && (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-8 text-center text-gray-400">
           <DollarSign size={32} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm font-body">Vendor financial details will be displayed here</p>
           <p className="text-xs font-body mt-1">Payouts, deductions, and settlement history for {vendor.name}</p>
@@ -249,7 +249,7 @@ export default function VendorDetail() {
       )}
 
       {activeTab === "compliance" && (
-        <div className="bg-white rounded-lg border border-gray-200 p-5">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-5">
           <h3 className="text-sm font-bold font-heading mb-4">Compliance Checklist</h3>
           <div className="space-y-3">
             {[
@@ -279,7 +279,7 @@ export default function VendorDetail() {
       )}
 
       {activeTab === "settings" && (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-8 text-center text-gray-400">
           <Building2 size={32} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm font-body">Vendor settings will be displayed here</p>
           <p className="text-xs font-body mt-1">Edit commission rates, portal access, and notification preferences</p>

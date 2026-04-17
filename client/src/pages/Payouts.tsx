@@ -76,7 +76,7 @@ export default function Payouts() {
   }
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       <div className="page-header">
         <h1>Payouts</h1>
         <p>Manage vendor payout disbursements</p>
@@ -118,7 +118,7 @@ export default function Payouts() {
         ))}
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-soft">
         <table className="data-table">
           <thead>
             <tr>

@@ -65,7 +65,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
+    <div className="p-6 space-y-6 page-enter">
       {/* Page Header */}
       <div className="page-header flex items-start justify-between">
         <div>
@@ -106,7 +106,7 @@ export default function Dashboard() {
           <h3 className="section-heading">Action Required</h3>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="action-card">
+          <div className="action-card card-hover animate-fade-in stagger-1">
             <div className="flex items-center justify-between">
               <div className="action-icon bg-yellow-50">
                 <AlertTriangle size={16} className="text-yellow-600" />
@@ -116,7 +116,7 @@ export default function Dashboard() {
             <p className="action-count text-yellow-700">{actionItems.fraudHold || 3}</p>
             <p className="action-label">Fraud Holds need review</p>
           </div>
-          <div className="action-card">
+          <div className="action-card card-hover animate-fade-in stagger-2">
             <div className="flex items-center justify-between">
               <div className="action-icon bg-red-50">
                 <Flag size={16} className="text-red-600" />
@@ -126,7 +126,7 @@ export default function Dashboard() {
             <p className="action-count text-red-700">{actionItems.slaBreaches || 2}</p>
             <p className="action-label">Vendor SLA Breaches</p>
           </div>
-          <div className="action-card">
+          <div className="action-card card-hover animate-fade-in stagger-3">
             <div className="flex items-center justify-between">
               <div className="action-icon bg-red-50">
                 <XCircle size={16} className="text-red-600" />
@@ -136,7 +136,7 @@ export default function Dashboard() {
             <p className="action-count text-red-700">{actionItems.complianceIssues || 5}</p>
             <p className="action-label">Compliance Issues</p>
           </div>
-          <div className="action-card">
+          <div className="action-card card-hover animate-fade-in stagger-4">
             <div className="flex items-center justify-between">
               <div className="action-icon bg-yellow-50">
                 <PackageX size={16} className="text-yellow-600" />
@@ -159,7 +159,7 @@ export default function Dashboard() {
 
       {/* KPI Cards Row 1 — LEFT colored borders */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="kpi-card kpi-green">
+        <div className="kpi-card kpi-green animate-fade-in stagger-1">
           <div className="flex items-center justify-between mb-1">
             <DollarSign size={18} className="text-green-500" />
             <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> 12.4%</span>
@@ -168,7 +168,7 @@ export default function Dashboard() {
           <p className="text-xs text-gray-500 font-body mt-1 uppercase tracking-wide">Total GMV</p>
           <p className="text-[11px] text-gray-400 font-body">Gross Merchandise Value</p>
         </div>
-        <div className="kpi-card kpi-blue">
+        <div className="kpi-card kpi-blue animate-fade-in stagger-2">
           <div className="flex items-center justify-between mb-1">
             <ShoppingCart size={18} className="text-blue-500" />
             <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> 8.2%</span>
@@ -177,7 +177,7 @@ export default function Dashboard() {
           <p className="text-xs text-gray-500 font-body mt-1 uppercase tracking-wide">Total Orders</p>
           <p className="text-[11px] text-gray-400 font-body">Orders placed this period</p>
         </div>
-        <div className="kpi-card kpi-purple">
+        <div className="kpi-card kpi-purple animate-fade-in stagger-3">
           <div className="flex items-center justify-between mb-1">
             <BarChart3 size={18} className="text-purple-500" />
             <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> 15.1%</span>
@@ -186,7 +186,7 @@ export default function Dashboard() {
           <p className="text-xs text-gray-500 font-body mt-1 uppercase tracking-wide">Commission Earned</p>
           <p className="text-[11px] text-gray-400 font-body">From Marketplace vendors (18% avg)</p>
         </div>
-        <div className="kpi-card kpi-orange">
+        <div className="kpi-card kpi-orange animate-fade-in stagger-4">
           <div className="flex items-center justify-between mb-1">
             <Percent size={18} className="text-orange-500" />
             <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> 11.3%</span>
@@ -236,7 +236,7 @@ export default function Dashboard() {
       {/* Two column layout: Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Selling Brands */}
-        <div className="bg-white rounded-lg border border-gray-200">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-soft animate-fade-in stagger-5">
           <div className="flex items-center justify-between p-5 border-b border-gray-100">
             <h3 className="section-heading">Top Selling Brands</h3>
           </div>
@@ -263,7 +263,7 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Orders */}
-        <div className="bg-white rounded-lg border border-gray-200">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-soft animate-fade-in stagger-6">
           <div className="flex items-center justify-between p-5 border-b border-gray-100">
             <h3 className="section-heading">Recent Orders</h3>
             <Link href="/orders" className="text-xs text-green-600 font-semibold font-body flex items-center gap-1 hover:text-green-700 transition-colors">

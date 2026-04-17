@@ -150,7 +150,7 @@ export default function ShipmentDetail() {
   const hasExceptions = shipment.exceptions.some((e) => !e.resolvedAt);
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-xs font-body text-gray-400">
         <Link href="/shipping" className="hover:text-gray-600 transition-colors">Shipping</Link>
@@ -221,7 +221,7 @@ export default function ShipmentDetail() {
       <div className="grid grid-cols-12 gap-5">
         {/* Left Column — Tracking Timeline */}
         <div className="col-span-7 space-y-4">
-          <div className="bg-white rounded-lg border border-gray-200 p-5">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-5">
             <h3 className="text-xs font-bold font-heading text-gray-500 uppercase tracking-wide mb-4">Tracking Timeline</h3>
             <div className="space-y-0">
               {shipment.trackingEvents.map((event, i) => (
@@ -255,7 +255,7 @@ export default function ShipmentDetail() {
           </div>
 
           {/* Notes Section */}
-          <div className="bg-white rounded-lg border border-gray-200 p-5">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-5">
             <h3 className="text-xs font-bold font-heading text-gray-500 uppercase tracking-wide mb-3">Notes & Communication</h3>
             {shipment.notes.length > 0 ? (
               <div className="space-y-3 mb-4">
@@ -290,7 +290,7 @@ export default function ShipmentDetail() {
         {/* Right Column — Context Cards */}
         <div className="col-span-5 space-y-4">
           {/* Shipment Info */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-4">
             <h3 className="text-xs font-bold font-heading text-gray-500 uppercase tracking-wide mb-3">Shipment Details</h3>
             <div className="space-y-2">
               {[
@@ -309,7 +309,7 @@ export default function ShipmentDetail() {
           </div>
 
           {/* Order Context */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-4">
             <h3 className="text-xs font-bold font-heading text-gray-500 uppercase tracking-wide mb-3">Order</h3>
             <Link href={`/orders/${shipment.order.id}`} className="flex items-center justify-between group">
               <span className="text-sm font-semibold font-body group-hover:text-blue-600 transition-colors">{shipment.order.orderNumber}</span>
@@ -318,7 +318,7 @@ export default function ShipmentDetail() {
           </div>
 
           {/* Vendor Context */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-4">
             <h3 className="text-xs font-bold font-heading text-gray-500 uppercase tracking-wide mb-3">Vendor</h3>
             <Link href={`/vendors/${shipment.vendor.id}`} className="flex items-center gap-2 group">
               <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">
@@ -333,7 +333,7 @@ export default function ShipmentDetail() {
           </div>
 
           {/* Items */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-4">
             <h3 className="text-xs font-bold font-heading text-gray-500 uppercase tracking-wide mb-3">Items ({shipment.items.length})</h3>
             <div className="space-y-2">
               {shipment.items.map((item, i) => (
@@ -350,7 +350,7 @@ export default function ShipmentDetail() {
 
           {/* Related Shipments */}
           {(shipment.parentShipment || shipment.childShipments.length > 0) && (
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-4">
               <h3 className="text-xs font-bold font-heading text-gray-500 uppercase tracking-wide mb-3">Related Shipments</h3>
               {shipment.parentShipment && (
                 <Link href={`/shipping/${shipment.parentShipment.id}`} className="flex items-center justify-between py-1.5 group">

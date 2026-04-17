@@ -177,7 +177,7 @@ export default function ProductDetail() {
   const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-xs font-body text-gray-400">
         <Link href="/products" className="hover:text-gray-600 transition-colors">Products</Link>
@@ -276,7 +276,7 @@ export default function ProductDetail() {
           </div>
 
           {/* Description */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-4">
             <h3 className="text-xs font-bold font-heading text-gray-500 uppercase tracking-wide mb-2">Description</h3>
             <p className="text-sm font-body text-gray-700 leading-relaxed">{product.description}</p>
           </div>
@@ -286,22 +286,22 @@ export default function ProductDetail() {
         <div className="col-span-7 space-y-4">
           {/* Key Metrics Row */}
           <div className="grid grid-cols-4 gap-3">
-            <div className="bg-white rounded-lg border border-gray-200 p-3">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-3">
               <DollarSign size={12} className="text-green-500 mb-1" />
               <p className="text-lg font-bold font-body">${product.retailPrice.toLocaleString()}</p>
               <p className="text-[10px] text-gray-400 font-body">Retail Price</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-3">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-3">
               <Tag size={12} className="text-blue-500 mb-1" />
               <p className="text-lg font-bold font-body">${product.wholesalePrice.toLocaleString()}</p>
               <p className="text-[10px] text-gray-400 font-body">Wholesale</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-3">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-3">
               <BarChart3 size={12} className="text-purple-500 mb-1" />
               <p className="text-lg font-bold font-body">{margin}%</p>
               <p className="text-[10px] text-gray-400 font-body">Margin</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-3">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-3">
               <Package size={12} className="text-orange-500 mb-1" />
               <p className="text-lg font-bold font-body">{totalStock}</p>
               <p className="text-[10px] text-gray-400 font-body">Total Stock</p>
@@ -311,7 +311,7 @@ export default function ProductDetail() {
           {/* Product Info Cards */}
           <div className="grid grid-cols-2 gap-3">
             {/* Vendor Card */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-4">
               <h3 className="text-xs font-bold font-heading text-gray-500 uppercase tracking-wide mb-3">Vendor</h3>
               <Link href={`/vendors/${product.vendor.id}`} className="flex items-center gap-2 group">
                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">
@@ -326,7 +326,7 @@ export default function ProductDetail() {
             </div>
 
             {/* Sync Status Card */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-4">
               <h3 className="text-xs font-bold font-heading text-gray-500 uppercase tracking-wide mb-3">Shopify Sync</h3>
               <div className="flex items-center gap-2 mb-2">
                 <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", SYNC_STYLES[product.syncStatus] || "bg-gray-100 text-gray-500")}>
@@ -345,7 +345,7 @@ export default function ProductDetail() {
           </div>
 
           {/* Enrichment Score */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-bold font-heading text-gray-500 uppercase tracking-wide">Enrichment Score</h3>
               <span className={cn(

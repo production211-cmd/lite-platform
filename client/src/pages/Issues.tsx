@@ -87,7 +87,7 @@ export default function Issues() {
   };
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold font-heading">Issues & Disputes</h1>

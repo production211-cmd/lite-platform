@@ -123,7 +123,7 @@ export default function ActivityLog() {
   };
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -216,7 +216,7 @@ export default function ActivityLog() {
               <div
                 key={entry.id}
                 className={cn(
-                  "bg-white rounded-lg border border-gray-200 border-l-4 p-4 hover:shadow-sm transition-shadow",
+                  "bg-white rounded-lg border border-gray-200 shadow-soft border-l-4 p-4 hover:shadow-sm transition-shadow",
                   SEVERITY_STYLES[entry.severity]
                 )}
               >
@@ -258,7 +258,7 @@ export default function ActivityLog() {
             );
           })
         ) : (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-12 text-center">
             <Activity size={32} className="text-gray-200 mx-auto mb-3" />
             <p className="text-sm text-gray-400 font-body">No matching activity found</p>
           </div>

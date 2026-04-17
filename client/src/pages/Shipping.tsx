@@ -92,7 +92,7 @@ export default function Shipping() {
   }
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       {/* Page Header */}
       <div className="page-header">
         <h1>Shipping View</h1>
@@ -175,7 +175,7 @@ export default function Shipping() {
       </div>
 
       {/* Shipments Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-soft">
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>

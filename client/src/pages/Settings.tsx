@@ -53,7 +53,7 @@ export default function Settings() {
   ];
 
   return (
-    <div className="p-6 animate-fade-in">
+    <div className="p-6 page-enter">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-xs font-body text-gray-400 mb-5">
         <span className="text-gray-700 font-medium">Settings</span>
@@ -107,7 +107,7 @@ export default function Settings() {
           {/* ===== ORGANIZATION: General ===== */}
           {activeSection === "general" && (
             <div className="space-y-5">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
                 <h3 className="text-sm font-bold font-heading mb-4">Platform Information</h3>
                 <div className="space-y-4">
                   <div>
@@ -150,7 +150,7 @@ export default function Settings() {
 
           {/* ===== ORGANIZATION: Team ===== */}
           {activeSection === "team" && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-bold font-heading">Team Members</h3>
                 <button className="px-3 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold font-body hover:bg-gray-800">+ Invite Member</button>
@@ -184,7 +184,7 @@ export default function Settings() {
 
           {/* ===== ORGANIZATION: Branding ===== */}
           {activeSection === "branding" && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
               <h3 className="text-sm font-bold font-heading mb-4">Branding & Appearance</h3>
               <div className="space-y-4">
                 <div>
@@ -217,7 +217,7 @@ export default function Settings() {
           {/* ===== INTEGRATIONS: Shopify ===== */}
           {activeSection === "shopify" && (
             <div className="space-y-5">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold font-heading">Shopify Store Connection</h3>
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600 font-body">
@@ -247,7 +247,7 @@ export default function Settings() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
                 <h3 className="text-sm font-bold font-heading mb-4">Sync Settings</h3>
                 <div className="space-y-3">
                   {[
@@ -274,7 +274,7 @@ export default function Settings() {
           {/* ===== INTEGRATIONS: Carriers ===== */}
           {activeSection === "shipping" && (
             <div className="space-y-5">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
                 <h3 className="text-sm font-bold font-heading mb-4">Carrier Integrations</h3>
                 <div className="space-y-3">
                   {[
@@ -301,7 +301,7 @@ export default function Settings() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
                 <h3 className="text-sm font-bold font-heading mb-4">Shipping Rules</h3>
                 <div className="space-y-3">
                   {[
@@ -322,7 +322,7 @@ export default function Settings() {
           {/* ===== INTEGRATIONS: Payments ===== */}
           {activeSection === "payments" && (
             <div className="space-y-5">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold font-heading">Revolut Business</h3>
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600 font-body">
@@ -347,7 +347,7 @@ export default function Settings() {
 
           {/* ===== INTEGRATIONS: Notifications ===== */}
           {activeSection === "notifications" && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
               <h3 className="text-sm font-bold font-heading mb-4">Notification Preferences</h3>
               <div className="space-y-3">
                 {[
@@ -388,7 +388,7 @@ export default function Settings() {
                   <p className="text-xs text-amber-700 font-body mt-0.5">Changes to security settings affect all users. All modifications are logged in the audit trail.</p>
                 </div>
               </div>
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
                 <h3 className="text-sm font-bold font-heading mb-4">Security Settings</h3>
                 <div className="space-y-3">
                   {[
@@ -422,7 +422,7 @@ export default function Settings() {
                   <p className="text-xs text-amber-700 font-body mt-0.5">API key regeneration is irreversible. All active integrations using the old key will stop working immediately.</p>
                 </div>
               </div>
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
                 <h3 className="text-sm font-bold font-heading mb-4">API Keys</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between py-2.5 border-b border-gray-50">

@@ -163,7 +163,7 @@ export function Sidebar() {
               {hasChildren ? (
                 <button
                   onClick={() => toggleExpanded(item.label)}
-                  className="w-full px-5 py-2.5 text-left flex items-center justify-between transition-colors text-[0.8125rem] font-body"
+                  className={`w-full px-5 py-2.5 text-left flex items-center justify-between text-[0.8125rem] font-body relative sidebar-nav-item ${active ? 'active' : ''}`}
                   style={{
                     backgroundColor: active ? "var(--sidebar-active)" : "transparent",
                     color: active ? "#ffffff" : "#9ca3af",
@@ -192,7 +192,7 @@ export function Sidebar() {
               ) : (
                 <Link
                   href={item.href}
-                  className="w-full px-5 py-2.5 flex items-center gap-3 transition-colors text-[0.8125rem] font-body"
+                  className={`w-full px-5 py-2.5 flex items-center gap-3 text-[0.8125rem] font-body relative sidebar-nav-item ${active ? 'active' : ''}`}
                   style={{
                     backgroundColor: active ? "var(--sidebar-active)" : "transparent",
                     color: active ? "#ffffff" : "#9ca3af",
@@ -231,7 +231,7 @@ export function Sidebar() {
                       <Link
                         key={child.href}
                         href={child.href}
-                        className="block px-5 py-2 pl-12 text-[0.8125rem] transition-colors font-body"
+                        className={`block px-5 py-2 pl-12 text-[0.8125rem] font-body sidebar-nav-item ${childActive ? 'active' : ''}`}
                         style={{
                           color: childActive ? "#ffffff" : "#6b7280",
                           backgroundColor: childActive ? "var(--sidebar-active)" : "transparent",

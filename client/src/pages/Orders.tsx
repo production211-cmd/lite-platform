@@ -113,7 +113,7 @@ export default function Orders() {
   }
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       {/* Page Header */}
       <div className="page-header">
         <h1>All Orders</h1>
@@ -129,7 +129,7 @@ export default function Orders() {
           { label: "Shipped", value: stats.shipped },
           { label: "Delivered", value: stats.delivered },
         ].map((s) => (
-          <div key={s.label} className="quick-stat">
+          <div key={s.label} className="quick-stat card-hover">
             <p className="stat-number">{s.value.toLocaleString()}</p>
             <p className="stat-label">{s.label}</p>
           </div>
@@ -178,7 +178,7 @@ export default function Orders() {
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-soft">
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>

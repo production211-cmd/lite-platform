@@ -34,7 +34,7 @@ export default function VendorBalances() {
     <div>
       <TopBar title="Vendor Balances" subtitle={`${balances.length} active vendors`} />
 
-      <div className="p-6 space-y-6 animate-fade-in">
+      <div className="p-6 space-y-6 page-enter">
         {/* Summary */}
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-[var(--border)] p-5">

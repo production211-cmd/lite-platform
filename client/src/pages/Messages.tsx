@@ -79,7 +79,7 @@ export default function Messages() {
     <div>
       <TopBar title="Messages Hub" subtitle="Team communication & vendor support" />
 
-      <div className="p-6 animate-fade-in">
+      <div className="p-6 page-enter">
         {/* Stats row */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <KPICard title="Total Threads" value={stats?.total || 0} format="number" icon={MessageSquare} iconColor="text-blue-600" />

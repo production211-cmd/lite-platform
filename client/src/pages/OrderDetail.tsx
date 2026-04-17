@@ -69,7 +69,7 @@ export default function OrderDetail() {
   ];
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
+    <div className="p-6 space-y-6 page-enter">
       {/* Back + Header */}
       <Link href="/orders" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 font-body">
         <ArrowLeft size={16} /> Back to Orders
@@ -94,7 +94,7 @@ export default function OrderDetail() {
       </div>
 
       {/* Timeline */}
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-5">
         <h3 className="text-sm font-bold font-heading mb-4">Order Timeline</h3>
         <div className="flex items-center justify-between">
           {timeline.map((step, i) => (
@@ -116,7 +116,7 @@ export default function OrderDetail() {
 
       <div className="grid grid-cols-3 gap-4">
         {/* Order Summary */}
-        <div className="bg-white rounded-lg border border-gray-200 p-5">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-5">
           <h3 className="text-sm font-bold font-heading mb-3">Order Summary</h3>
           <div className="space-y-2.5">
             <div className="flex justify-between text-sm font-body">
@@ -139,7 +139,7 @@ export default function OrderDetail() {
         </div>
 
         {/* Customer Info */}
-        <div className="bg-white rounded-lg border border-gray-200 p-5">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-5">
           <h3 className="text-sm font-bold font-heading mb-3">Customer</h3>
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -154,7 +154,7 @@ export default function OrderDetail() {
         </div>
 
         {/* Payment Info */}
-        <div className="bg-white rounded-lg border border-gray-200 p-5">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-5">
           <h3 className="text-sm font-bold font-heading mb-3">Payment</h3>
           <div className="space-y-2">
             <div className="flex justify-between text-sm font-body">

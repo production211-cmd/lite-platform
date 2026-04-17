@@ -73,7 +73,7 @@ export default function OrderAnalytics() {
         }
       />
 
-      <div className="p-6 space-y-6 animate-fade-in">
+      <div className="p-6 space-y-6 page-enter">
         {/* KPI Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl border border-[var(--border)] p-5">

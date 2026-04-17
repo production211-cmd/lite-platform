@@ -132,7 +132,7 @@ export default function QueueMonitor() {
   };
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -253,7 +253,7 @@ export default function QueueMonitor() {
 
       {/* Job Detail */}
       {selectedQueue && (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-soft overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-sm font-bold font-heading capitalize">{selectedQueue.replace(/-/g, " ")} — Jobs</h3>
             <div className="flex items-center gap-3">

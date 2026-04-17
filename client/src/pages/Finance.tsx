@@ -45,7 +45,7 @@ export default function Finance() {
     <div>
       <TopBar title="Finance & Accounting" subtitle="Revenue, payouts, and P&L overview" />
 
-      <div className="p-6 space-y-6 animate-fade-in">
+      <div className="p-6 space-y-6 page-enter">
         {/* P&L Summary */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KPICard title="Total Revenue" value={pnl?.revenue || 0} format="currency" icon={DollarSign} iconColor="text-emerald-600" />

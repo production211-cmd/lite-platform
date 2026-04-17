@@ -47,3 +47,53 @@
 - [ ] Redis Provisioning + Worker Activation
 - [ ] Testing Suite (unit, integration, e2e)
 - [ ] Vendor Onboarding Flow (6-step wizard)
+
+## UI Polish & Design Refinement (Current)
+
+### Global Design System (index.css)
+- [ ] Add global CSS transitions for all interactive elements
+- [ ] Add smooth scroll behavior
+- [ ] Add fade-in keyframe animation for page content
+- [ ] Add slide-up animation for cards and list items
+- [ ] Improve form input focus states
+- [ ] Add hover scale micro-interaction for clickable cards
+
+### Sidebar
+- [ ] Add smooth hover transitions on nav items
+- [ ] Add active indicator animation
+- [ ] Add subtle glow on active nav item
+
+### Dashboard
+- [ ] Add staggered fade-in for stat cards
+- [ ] Add hover lift on Action Required cards
+- [ ] Improve table row hover states
+- [ ] Add subtle card shadows
+
+### Products Page
+- [ ] Add table row hover effect
+- [ ] Improve View button hover state
+- [ ] Add smooth filter tab transitions
+
+### Activity Log
+- [ ] Add staggered entry animation
+- [ ] Improve filter chip active/hover states
+- [ ] Add hover effect on log entries
+
+### Settings
+- [ ] Add smooth section transition
+- [ ] Improve form input styling
+- [ ] Improve left nav active state indicator
+
+### Vendor Onboarding
+- [ ] Improve stepper visual design
+- [ ] Add step transition animation
+- [ ] Improve progress bar with gradient
+
+### Detail Pages
+- [ ] Add page content fade-in
+- [ ] Add timeline entry stagger animation
+- [ ] Improve action button hover states
+
+### Queue Monitor
+- [ ] Add queue card hover effects
+- [ ] Improve confirm dialog animation

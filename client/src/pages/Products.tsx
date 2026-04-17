@@ -85,7 +85,7 @@ export default function Products() {
   }
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 page-enter">
       <div className="flex items-start justify-between">
         <div className="page-header">
           <h1>Products</h1>
@@ -98,19 +98,19 @@ export default function Products() {
       </div>
 
       <div className="grid grid-cols-4 gap-3">
-        <div className="quick-stat">
+        <div className="quick-stat card-hover animate-fade-in stagger-1">
           <p className="stat-number">{stats.total}</p>
           <p className="stat-label">Total Products</p>
         </div>
-        <div className="quick-stat">
+        <div className="quick-stat card-hover animate-fade-in stagger-2">
           <p className="stat-number">{stats.active}</p>
           <p className="stat-label">Active</p>
         </div>
-        <div className="quick-stat">
+        <div className="quick-stat card-hover animate-fade-in stagger-3">
           <p className="stat-number">{stats.pending}</p>
           <p className="stat-label">Pending Review</p>
         </div>
-        <div className="quick-stat">
+        <div className="quick-stat card-hover animate-fade-in stagger-4">
           <p className="stat-number">{formatCurrency(stats.avgPrice)}</p>
           <p className="stat-label">Avg. Price</p>
         </div>
@@ -173,7 +173,7 @@ export default function Products() {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-soft">
           <table className="data-table">
             <thead>
               <tr>
