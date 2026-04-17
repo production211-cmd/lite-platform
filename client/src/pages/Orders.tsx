@@ -146,15 +146,15 @@ export default function Orders() {
                     </td>
                     <td>
                       <div className="flex flex-wrap gap-1">
-                        {order.subOrders?.map((so: any) => (
-                          <span key={so.id} className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-medium">
-                            {so.vendor?.name}
+                        {order.vendorOrders?.map((vo: any) => (
+                          <span key={vo.id} className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-medium">
+                            {vo.vendor?.name}
                           </span>
                         ))}
                       </div>
                     </td>
                     <td className="text-xs text-center">
-                      {order.subOrders?.reduce((acc: number, so: any) => acc + (so.items?.length || 0), 0) || 0}
+                      {order.vendorOrders?.reduce((acc: number, vo: any) => acc + (vo.items?.length || 0), 0) || 0}
                     </td>
                     <td className="font-medium">{formatCurrency(order.totalAmount)}</td>
                     <td><StatusBadge status={order.status} size="xs" /></td>

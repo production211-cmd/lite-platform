@@ -82,7 +82,7 @@ export default function Returns() {
               <tbody>
                 {returns.map((r: any) => (
                   <tr key={r.id}>
-                    <td className="text-xs font-medium text-[#c8a45c]">{r.subOrder?.order?.orderNumber || "—"}</td>
+                    <td className="text-xs font-medium text-[#c8a45c]">{r.vendorOrder?.order?.orderNumber || "—"}</td>
                     <td className="text-xs">{r.vendor?.name}</td>
                     <td className="text-xs">{r.reason || "—"}</td>
                     <td className="text-xs font-medium">{r.refundAmount ? formatCurrency(r.refundAmount) : "—"}</td>

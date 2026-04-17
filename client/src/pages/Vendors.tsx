@@ -157,7 +157,7 @@ export default function Vendors() {
                       <p className="text-[10px] text-slate-500">Products</p>
                     </div>
                     <div className="bg-slate-50 rounded-lg p-2.5 text-center">
-                      <p className="text-lg font-bold">{vendor._count?.subOrders || 0}</p>
+                      <p className="text-lg font-bold">{vendor._count?.vendorOrders || 0}</p>
                       <p className="text-[10px] text-slate-500">Orders</p>
                     </div>
                   </div>
@@ -229,7 +229,7 @@ export default function Vendors() {
                     <td className="text-xs">{vendor.integrationType}</td>
                     <td className="text-xs">{vendor.commissionRate ? `${vendor.commissionRate}%` : "—"}</td>
                     <td className="text-xs font-medium">{vendor._count?.products || 0}</td>
-                    <td className="text-xs font-medium">{vendor._count?.subOrders || 0}</td>
+                    <td className="text-xs font-medium">{vendor._count?.vendorOrders || 0}</td>
                     <td>
                       <span className={cn(
                         "text-[10px] font-medium px-2 py-0.5 rounded-full",

@@ -11,6 +11,11 @@ import { Route, Switch, useLocation, Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 import { TopBar } from "@/components/TopBar";
+import VendorDashboard from "@/pages/vendor/VendorDashboard";
+import VendorProducts from "@/pages/vendor/VendorProducts";
+import VendorOrders from "@/pages/vendor/VendorOrders";
+import VendorShipments from "@/pages/vendor/VendorShipments";
+import VendorFinance from "@/pages/vendor/VendorFinance";
 import {
   House, Package, ShoppingCart, Truck, DollarSign,
   MessageSquare, Settings, ChevronRight, ChevronDown,
@@ -219,31 +224,8 @@ function VendorSidebar() {
 }
 
 // ============================================================
-// Vendor Page Placeholders
+// Placeholder for pages not yet implemented
 // ============================================================
-
-function VendorDashboard() {
-  return (
-    <div className="p-8">
-      <h2 className="font-heading small-caps text-2xl mb-4">Vendor Dashboard</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
-          <p className="text-sm text-gray-500 mb-1">Active Orders</p>
-          <p className="text-3xl font-bold text-gray-800">—</p>
-        </div>
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
-          <p className="text-sm text-gray-500 mb-1">Products Listed</p>
-          <p className="text-3xl font-bold text-gray-800">—</p>
-        </div>
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
-          <p className="text-sm text-gray-500 mb-1">Pending Payouts</p>
-          <p className="text-3xl font-bold text-gray-800">—</p>
-        </div>
-      </div>
-      <p className="text-gray-400 text-sm mt-6">Vendor-specific dashboard data will load from API.</p>
-    </div>
-  );
-}
 
 function VendorPlaceholder({ title }: { title: string }) {
   return (
@@ -269,19 +251,21 @@ function VendorContent() {
         className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
         style={{ marginLeft: `${sidebarWidth}px` }}
       >
-        <TopBar title="Vendor Portal" subtitle="Vendor Management" />
         <main className="flex-1 overflow-y-auto">
           <Switch>
             <Route path="/vendor" component={VendorDashboard} />
-            <Route path="/vendor/products">{() => <VendorPlaceholder title="My Products" />}</Route>
+            <Route path="/vendor/products" component={VendorProducts} />
             <Route path="/vendor/products/new">{() => <VendorPlaceholder title="Add Product" />}</Route>
-            <Route path="/vendor/orders">{() => <VendorPlaceholder title="My Orders" />}</Route>
-            <Route path="/vendor/orders/pending">{() => <VendorPlaceholder title="Pending Orders" />}</Route>
+            <Route path="/vendor/orders" component={VendorOrders} />
+            <Route path="/vendor/orders/pending">{() => {
+              // Filter to pending only via VendorOrders with preset filter
+              return <VendorOrders />;
+            }}</Route>
             <Route path="/vendor/orders/returns">{() => <VendorPlaceholder title="Returns" />}</Route>
-            <Route path="/vendor/shipments">{() => <VendorPlaceholder title="Shipments" />}</Route>
+            <Route path="/vendor/shipments" component={VendorShipments} />
             <Route path="/vendor/messages">{() => <VendorPlaceholder title="Messages" />}</Route>
-            <Route path="/vendor/finance">{() => <VendorPlaceholder title="Finance Overview" />}</Route>
-            <Route path="/vendor/finance/payouts">{() => <VendorPlaceholder title="Payouts" />}</Route>
+            <Route path="/vendor/finance" component={VendorFinance} />
+            <Route path="/vendor/finance/payouts" component={VendorFinance} />
             <Route path="/vendor/analytics">{() => <VendorPlaceholder title="Analytics" />}</Route>
             <Route path="/vendor/settings">{() => <VendorPlaceholder title="Settings" />}</Route>
             <Route>

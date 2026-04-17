@@ -159,7 +159,7 @@ export default function Dashboard() {
                   <tr key={vendor.id}>
                     <td className="font-medium font-body">{vendor.name}</td>
                     <td className="font-body">{formatCurrency(vendor.totalRevenue || 0)}</td>
-                    <td className="font-body">{vendor._count?.subOrders || 0}</td>
+                    <td className="font-body">{vendor._count?.vendorOrders || 0}</td>
                   </tr>
                 ))}
               </tbody>

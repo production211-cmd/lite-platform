@@ -18,10 +18,16 @@ import Shipping from "@/pages/Shipping";
 import Messages from "@/pages/Messages";
 import Finance from "@/pages/Finance";
 import Returns from "@/pages/Returns";
+import PendingOrders from "@/pages/PendingOrders";
+import OrderAnalytics from "@/pages/OrderAnalytics";
+import PendingProducts from "@/pages/PendingProducts";
+import Payouts from "@/pages/Payouts";
+import Deductions from "@/pages/Deductions";
+import VendorBalances from "@/pages/VendorBalances";
 import {
-  Ads, Marketing, SettingsPage, OrderAnalytics, Issues,
-  PendingOrders, ProductPricing, ProductEnrichment, PendingProducts,
-  ShippingCosts, ShippingSettings, Payouts, Deductions, VendorBalances,
+  Ads, Marketing, SettingsPage, Issues,
+  ProductPricing, ProductEnrichment,
+  ShippingCosts, ShippingSettings,
 } from "@/pages/Placeholder";
 
 function AdminContent() {

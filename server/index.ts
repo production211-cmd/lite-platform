@@ -21,6 +21,7 @@ import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
 
 import { registerGlobalAuthHook } from "./middleware/auth.js";
+import { registerRlsHook } from "./middleware/rls.js";
 import { authRoutes } from "./routes/auth.js";
 import { vendorRoutes } from "./routes/vendors.js";
 import { productRoutes } from "./routes/products.js";
@@ -106,6 +107,13 @@ app.decorate("prisma", prisma);
 // ============================================================
 
 registerGlobalAuthHook(app);
+
+// ============================================================
+// PostgreSQL RLS Context Hook — sets session variables for tenant isolation
+// Must be registered AFTER auth hook so request.authUser is available
+// ============================================================
+
+registerRlsHook(app, prisma);
 
 // ============================================================
 // Health Check (public — no auth required)

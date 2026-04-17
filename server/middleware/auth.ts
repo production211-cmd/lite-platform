@@ -5,7 +5,8 @@
  * 
  * - Global auth hook on all /api/* except public routes
  * - requireRole() decorator for RBAC
- * - Tenant scoping via Prisma middleware (preparing for PostgreSQL RLS)
+ * - Tenant scoping via PostgreSQL Row-Level Security (RLS)
+ * - RLS session variables set per-request (app.current_vendor_id, app.current_user_role)
  * - Refresh token family tracking with reuse detection
  */
 
@@ -106,11 +107,12 @@ export function requireRole(...allowedRoles: AuthUser["role"][]) {
 }
 
 // ============================================================
-// Tenant Scope Utility
+// Tenant Scope Utility (Application-Level)
 // ============================================================
-// NOTE: This is a Prisma-level middleware approach.
-// For production, migrate to PostgreSQL Row-Level Security (RLS)
-// with session-level `app.current_tenant` parameter.
+// NOTE: This is a secondary application-level filter.
+// The PRIMARY security boundary is PostgreSQL RLS (see middleware/rls.ts).
+// These utilities provide explicit scoping for queries that need it,
+// but even without them, RLS policies enforce tenant isolation at the DB layer.
 
 export function getTenantFilter(request: FastifyRequest): { vendorId: string } | {} {
   if (!request.authUser) return {};

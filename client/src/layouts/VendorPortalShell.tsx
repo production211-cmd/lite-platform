@@ -12,6 +12,9 @@
 
 import { Route, Switch, Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import PortalOrders from "@/pages/vendor/PortalOrders";
+import VendorProducts from "@/pages/vendor/VendorProducts";
+import VendorFinance from "@/pages/vendor/VendorFinance";
 import { LogOut, Package, ShoppingCart, DollarSign, HelpCircle } from "lucide-react";
 
 // ============================================================
@@ -83,7 +86,7 @@ function PortalTopBar() {
 }
 
 // ============================================================
-// Portal Page Placeholders
+// Portal Home — Quick action cards
 // ============================================================
 
 function PortalHome() {
@@ -145,9 +148,9 @@ export function VendorPortalShell() {
       <main className="flex-1">
         <Switch>
           <Route path="/vendor/portal" component={PortalHome} />
-          <Route path="/vendor/portal/orders">{() => <PortalPlaceholder title="My Orders" />}</Route>
-          <Route path="/vendor/portal/products">{() => <PortalPlaceholder title="My Products" />}</Route>
-          <Route path="/vendor/portal/payouts">{() => <PortalPlaceholder title="Payouts" />}</Route>
+          <Route path="/vendor/portal/orders" component={PortalOrders} />
+          <Route path="/vendor/portal/products" component={VendorProducts} />
+          <Route path="/vendor/portal/payouts" component={VendorFinance} />
           <Route path="/vendor/portal/help">{() => <PortalPlaceholder title="Help & Support" />}</Route>
           <Route>
             <div className="flex items-center justify-center h-[60vh]">
