@@ -1,0 +1,783 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  RETAILER_LT
+  VENDOR_USER
+}
+
+enum EconomicModel {
+  MARKETPLACE
+  WHOLESALE
+}
+
+enum VendorLocation {
+  DOMESTIC_US
+  INTERNATIONAL
+}
+
+enum IntegrationType {
+  SHOPIFY
+  API
+  MAGENTO
+  CSV
+}
+
+enum BrandStructure {
+  UNI_BRAND
+  MULTI_BRAND
+}
+
+enum ShippingModel {
+  DTC_A
+  DTC_B
+  B2B_A
+  B2B_B
+}
+
+enum Currency {
+  USD
+  EUR
+  GBP
+  CHF
+  SEK
+  DKK
+  NOK
+  CAD
+  AUD
+}
+
+enum ProductStatus {
+  PENDING_REVIEW
+  APPROVED
+  QUALIFIED
+  NEEDS_REVIEW
+  PUSHED
+  REJECTED
+  ARCHIVED
+  DELETED_BY_VENDOR
+}
+
+enum OrderStatus {
+  PLACED
+  SPLIT
+  VENDOR_ACCEPT
+  FRAUD_HOLD
+  VENDOR_REJECTED
+  GENERATE_LABEL
+  SHIPPED
+  IN_TRANSIT
+  DELIVERED
+  SETTLED
+  CANCELLED
+  RETURN_INITIATED
+  RETURN_RECEIVED
+  RETURN_COMPLETED
+}
+
+enum ShipmentLeg {
+  LEG_1
+  LEG_2
+  DIRECT
+}
+
+enum ShipmentStatus {
+  LABEL_CREATED
+  LABEL_VOIDED
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  EXCEPTION
+  RETURNED
+}
+
+enum ReturnStatus {
+  INITIATED
+  LABEL_GENERATED
+  IN_TRANSIT
+  RECEIVED_WAREHOUSE
+  INSPECTING
+  APPROVED
+  REJECTED
+  REFUNDED
+  FORWARDED_TO_VENDOR
+  COMPLETED
+}
+
+enum PayoutCycle {
+  NEXT_DAY
+  NET_14
+  NET_30
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  ON_HOLD
+}
+
+enum MessageDepartment {
+  OPS
+  RMS
+  CX
+  CATALOG_BUYER
+  VENDOR_SUPPORT
+}
+
+enum MessagePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum MessageStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum DeductionType {
+  SHIPPING_COST
+  PENALTY
+  RETURN_REFUND
+  MARKETPLACE_FEE
+  OTHER
+}
+
+enum PricingStrategy {
+  PREMIUM_POSITIONING
+  COMPETITIVE_PRICING
+  DYNAMIC_PRICING
+  CLEARANCE_PRICING
+  EVENT_PRICING
+}
+
+enum ComplianceRisk {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Carrier {
+  FEDEX
+  DHL
+  UPS
+}
+
+// ============================================================
+// USERS & AUTH
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          UserRole
+  vendorId      String?
+  vendor        Vendor?   @relation(fields: [vendorId], references: [id])
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sentMessages     Message[]        @relation("SentMessages")
+  assignedMessages MessageThread[]  @relation("AssignedAgent")
+
+  @@index([email])
+  @@index([vendorId])
+}
+
+// ============================================================
+// VENDORS
+// ============================================================
+
+model Vendor {
+  id                String          @id @default(cuid())
+  name              String
+  slug              String          @unique
+  economicModel     EconomicModel
+  location          VendorLocation
+  country           String          @default("US")
+  city              String?
+  integrationType   IntegrationType
+  brandStructure    BrandStructure
+  currency          Currency        @default(USD)
+  shippingModel     ShippingModel
+  commissionRate    Float?          // percentage, e.g. 20.0 = 20%
+  payoutCycle       PayoutCycle     @default(NET_30)
+  contactEmail      String?
+  contactPhone      String?
+  taxId             String?
+  bankingDetails    Json?
+  logoUrl           String?
+  isActive          Boolean         @default(true)
+  onboardedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  connectorConfig   VendorConnectorConfig?
+  users             User[]
+  products          Product[]
+  subOrders         SubOrder[]
+  shipments         Shipment[]
+  returns           Return[]
+  payouts           Payout[]
+  deductions        Deduction[]
+  messageThreads    MessageThread[]
+  performanceMetrics VendorPerformance[]
+
+  @@index([slug])
+  @@index([economicModel])
+  @@index([location])
+}
+
+model VendorConnectorConfig {
+  id                String          @id @default(cuid())
+  vendorId          String          @unique
+  vendor            Vendor          @relation(fields: [vendorId], references: [id])
+  integrationType   IntegrationType
+  shopifyStoreUrl   String?
+  shopifyAccessToken String?
+  apiEndpoint       String?
+  apiKey            String?
+  apiSecret         String?
+  webhookSecret     String?
+  syncEnabled       Boolean         @default(true)
+  lastSyncAt        DateTime?
+  syncFrequency     Int?            @default(300) // seconds
+  config            Json?           // additional config
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model VendorPerformance {
+  id                  String   @id @default(cuid())
+  vendorId            String
+  vendor              Vendor   @relation(fields: [vendorId], references: [id])
+  period              String   // e.g. "2026-04"
+  fulfillmentRate     Float?
+  acceptanceRate      Float?
+  slaComplianceRate   Float?
+  returnRate          Float?
+  avgShipTime         Float?   // hours
+  totalOrders         Int      @default(0)
+  totalRevenue        Float    @default(0)
+  totalCommission     Float    @default(0)
+  createdAt           DateTime @default(now())
+
+  @@unique([vendorId, period])
+  @@index([vendorId])
+}
+
+// ============================================================
+// PRODUCTS & CATALOG
+// ============================================================
+
+model Product {
+  id                  String        @id @default(cuid())
+  vendorId            String
+  vendor              Vendor        @relation(fields: [vendorId], references: [id])
+  shopifyProductId    String?
+  vendorSku           String?
+  retailerSku         String?
+  title               String
+  description         String?
+  bodyHtml            String?
+  productType         String?
+  category            String?
+  subcategory         String?
+  brand               String?
+  tags                String[]
+  status              ProductStatus @default(PENDING_REVIEW)
+
+  // Price fields (4 price concepts)
+  compareAtPrice      Float?        // MSRP
+  salesPrice          Float?        // customer-facing price
+  retailerCost        Float?        // L&T internal cost
+  vendorCost          Float?        // vendor's own cost tracking
+  currency            Currency      @default(USD)
+
+  // Enrichment
+  enrichmentScore     Int?          @default(0)
+  attributeScore      Int?          @default(0)
+  descriptionScore    Int?          @default(0)
+  seoScore            Int?          @default(0)
+  geoScore            Int?          @default(0)
+  metaTitle           String?
+  metaDescription     String?
+  keywords            String[]
+
+  // Compliance
+  hsCode              String?
+  countryOfOrigin     String?
+  complianceRisk      ComplianceRisk?
+  requiresFda         Boolean       @default(false)
+  requiresCites       Boolean       @default(false)
+
+  // Location
+  shipsFrom           String?       // "Italy", "Spain", "USA", etc.
+
+  // Images
+  images              ProductImage[]
+  variants            ProductVariant[]
+  priceHistory        ProductPriceHistory[]
+  orderItems          OrderItem[]
+
+  isDeleted           Boolean       @default(false)
+  deletedByVendorAt   DateTime?
+  publishedAt         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([vendorId])
+  @@index([status])
+  @@index([shopifyProductId])
+  @@index([brand])
+  @@index([category])
+}
+
+model ProductVariant {
+  id                  String    @id @default(cuid())
+  productId           String
+  product             Product   @relation(fields: [productId], references: [id])
+  shopifyVariantId    String?
+  vendorSku           String?
+  retailerSku         String?
+  title               String?
+  size                String?
+  color               String?
+  material            String?
+  weight              Float?
+  weightUnit          String?   @default("kg")
+  compareAtPrice      Float?
+  salesPrice          Float?
+  retailerCost        Float?
+  vendorCost          Float?
+  inventoryQuantity   Int       @default(0)
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  orderItems          OrderItem[]
+
+  @@index([productId])
+  @@index([shopifyVariantId])
+}
+
+model ProductImage {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  url           String
+  altText       String?
+  position      Int       @default(0)
+  isGenerated   Boolean   @default(false) // AI-generated image
+  pipeline      String?   // VTO, BGSWAP, SUBJECT
+  isCompliant   Boolean   @default(true)
+  complianceIssues String[]
+  createdAt     DateTime  @default(now())
+
+  @@index([productId])
+}
+
+model ProductPriceHistory {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  field         String    // compareAtPrice, salesPrice, retailerCost, vendorCost
+  oldValue      Float?
+  newValue      Float?
+  currency      Currency
+  source        String    // vendor_sync, admin_edit, ai_suggestion
+  changedBy     String?   // userId or "system"
+  createdAt     DateTime  @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// ORDERS
+// ============================================================
+
+model Order {
+  id                  String      @id @default(cuid())
+  shopifyOrderId      String?     @unique
+  orderNumber         String      @unique
+  customerEmail       String?
+  customerName        String?
+  shippingAddress     Json?
+  billingAddress      Json?
+  totalAmount         Float
+  currency            Currency    @default(USD)
+  status              OrderStatus @default(PLACED)
+  fraudStatus         String?     // clear, hold, flagged
+  fraudProvider       String?     // Eye4Fraud
+  paymentStatus       String?     // authorized, paid, refunded
+  notes               String?
+  placedAt            DateTime    @default(now())
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  subOrders           SubOrder[]
+  priceSnapshot       OrderPriceSnapshot?
+
+  @@index([shopifyOrderId])
+  @@index([orderNumber])
+  @@index([status])
+  @@index([placedAt])
+}
+
+model SubOrder {
+  id                  String      @id @default(cuid())
+  orderId             String
+  order               Order       @relation(fields: [orderId], references: [id])
+  vendorId            String
+  vendor              Vendor      @relation(fields: [vendorId], references: [id])
+  vendorOrderId       String?     // vendor's own order ID
+  status              OrderStatus @default(PLACED)
+  subtotal            Float
+  commission          Float?
+  commissionRate      Float?
+  vendorEarnings      Float?
+  currency            Currency    @default(USD)
+  acceptedAt          DateTime?
+  rejectedAt          DateTime?
+  rejectionReason     String?
+  shippedAt           DateTime?
+  deliveredAt         DateTime?
+  slaDeadline         DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  items               OrderItem[]
+  shipments           Shipment[]
+  returns             Return[]
+
+  @@index([orderId])
+  @@index([vendorId])
+  @@index([status])
+}
+
+model OrderItem {
+  id                  String        @id @default(cuid())
+  subOrderId          String
+  subOrder            SubOrder      @relation(fields: [subOrderId], references: [id])
+  productId           String
+  product             Product       @relation(fields: [productId], references: [id])
+  variantId           String?
+  variant             ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity            Int
+  unitPrice           Float
+  totalPrice          Float
+  retailerCost        Float?
+  vendorCost          Float?
+  currency            Currency      @default(USD)
+  createdAt           DateTime      @default(now())
+
+  @@index([subOrderId])
+  @@index([productId])
+}
+
+model OrderPriceSnapshot {
+  id                  String    @id @default(cuid())
+  orderId             String    @unique
+  order               Order     @relation(fields: [orderId], references: [id])
+  snapshot            Json      // full price data at order time
+  exchangeRate        Float?
+  exchangeRateSource  String?
+  exchangeRateAt      DateTime?
+  createdAt           DateTime  @default(now())
+}
+
+// ============================================================
+// SHIPPING
+// ============================================================
+
+model Shipment {
+  id                  String          @id @default(cuid())
+  subOrderId          String
+  subOrder            SubOrder        @relation(fields: [subOrderId], references: [id])
+  vendorId            String
+  vendor              Vendor          @relation(fields: [vendorId], references: [id])
+  shippingModel       ShippingModel
+  carrier             Carrier?
+  leg                 ShipmentLeg     @default(DIRECT)
+  status              ShipmentStatus  @default(LABEL_CREATED)
+
+  // Label info
+  trackingNumber      String?
+  labelUrl            String?
+  labelVoidedAt       DateTime?
+  packingSlipUrl      String?
+
+  // ETD documents (international)
+  commercialInvoiceUrl String?
+  etdUploaded         Boolean         @default(false)
+  etdUploadedAt       DateTime?
+
+  // Carrier details
+  carrierAccountNumber String?
+  serviceType         String?
+  estimatedDelivery   DateTime?
+  actualDelivery      DateTime?
+
+  // Package details
+  weight              Float?
+  weightUnit          String?         @default("kg")
+  length              Float?
+  width               Float?
+  height              Float?
+  dimensionUnit       String?         @default("cm")
+
+  // Cost
+  shippingCost        Float?
+  costCurrency        Currency        @default(USD)
+  fuelSurcharge       Float?
+  dutiesAndTaxes      Float?
+
+  // Addresses
+  originAddress       Json?
+  destinationAddress  Json?
+
+  // Parent shipment for 2-leg B2B
+  parentShipmentId    String?
+  parentShipment      Shipment?       @relation("ShipmentLegs", fields: [parentShipmentId], references: [id])
+  childShipments      Shipment[]      @relation("ShipmentLegs")
+
+  trackingEvents      TrackingEvent[]
+
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([subOrderId])
+  @@index([vendorId])
+  @@index([trackingNumber])
+  @@index([status])
+}
+
+model TrackingEvent {
+  id            String    @id @default(cuid())
+  shipmentId    String
+  shipment      Shipment  @relation(fields: [shipmentId], references: [id])
+  status        String
+  description   String?
+  location      String?
+  timestamp     DateTime
+  rawPayload    Json?
+  createdAt     DateTime  @default(now())
+
+  @@index([shipmentId])
+  @@index([timestamp])
+}
+
+// ============================================================
+// RETURNS
+// ============================================================
+
+model Return {
+  id                  String        @id @default(cuid())
+  subOrderId          String
+  subOrder            SubOrder      @relation(fields: [subOrderId], references: [id])
+  vendorId            String
+  vendor              Vendor        @relation(fields: [vendorId], references: [id])
+  status              ReturnStatus  @default(INITIATED)
+  reason              String?
+  customerNotes       String?
+  returnTrackingNumber String?
+  returnLabelUrl      String?
+  inspectionNotes     String?
+  inspectionPhotos    String[]
+  isRgrEligible       Boolean       @default(false) // Returned Goods Relief
+  rgrDeclarationRef   String?
+  refundAmount        Float?
+  refundCurrency      Currency      @default(USD)
+  initiatedAt         DateTime      @default(now())
+  receivedAt          DateTime?
+  inspectedAt         DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([subOrderId])
+  @@index([vendorId])
+  @@index([status])
+}
+
+// ============================================================
+// FINANCE & PAYOUTS
+// ============================================================
+
+model Payout {
+  id                  String        @id @default(cuid())
+  vendorId            String
+  vendor              Vendor        @relation(fields: [vendorId], references: [id])
+  amount              Float
+  currency            Currency
+  exchangeRate        Float?
+  exchangeRateAt      DateTime?
+  status              PayoutStatus  @default(PENDING)
+  payoutCycle         PayoutCycle
+  processorRef        String?       // Stripe/Revolut reference
+  processedAt         DateTime?
+  failedAt            DateTime?
+  failureReason       String?
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  items               PayoutItem[]
+
+  @@index([vendorId])
+  @@index([status])
+}
+
+model PayoutItem {
+  id            String    @id @default(cuid())
+  payoutId      String
+  payout        Payout    @relation(fields: [payoutId], references: [id])
+  subOrderId    String?
+  description   String?
+  amount        Float
+  currency      Currency
+  createdAt     DateTime  @default(now())
+
+  @@index([payoutId])
+}
+
+model Deduction {
+  id            String          @id @default(cuid())
+  vendorId      String
+  vendor        Vendor          @relation(fields: [vendorId], references: [id])
+  type          DeductionType
+  amount        Float
+  currency      Currency        @default(USD)
+  reason        String?
+  referenceId   String?         // orderId, returnId, etc.
+  isApplied     Boolean         @default(false)
+  appliedAt     DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@index([vendorId])
+  @@index([type])
+}
+
+// ============================================================
+// MESSAGING
+// ============================================================
+
+model MessageThread {
+  id                  String            @id @default(cuid())
+  vendorId            String
+  vendor              Vendor            @relation(fields: [vendorId], references: [id])
+  subject             String
+  department          MessageDepartment
+  priority            MessagePriority   @default(NORMAL)
+  status              MessageStatus     @default(OPEN)
+  assignedToId        String?
+  assignedTo          User?             @relation("AssignedAgent", fields: [assignedToId], references: [id])
+  referenceType       String?           // order, return, product, shipment
+  referenceId         String?
+  slaDeadline         DateTime?
+  resolvedAt          DateTime?
+  closedAt            DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  messages            Message[]
+
+  @@index([vendorId])
+  @@index([department])
+  @@index([status])
+  @@index([assignedToId])
+}
+
+model Message {
+  id            String        @id @default(cuid())
+  threadId      String
+  thread        MessageThread @relation(fields: [threadId], references: [id])
+  senderId      String
+  sender        User          @relation("SentMessages", fields: [senderId], references: [id])
+  content       String
+  isInternal    Boolean       @default(false) // internal note
+  attachments   String[]
+  readAt        DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@index([threadId])
+  @@index([senderId])
+}
+
+// ============================================================
+// COMPLIANCE
+// ============================================================
+
+model ComplianceDocument {
+  id                  String    @id @default(cuid())
+  shipmentId          String?
+  productId           String?
+  vendorId            String?
+  documentType        String    // commercial_invoice, packing_slip, fda_declaration, dichiarazione, footwear_form
+  fileUrl             String
+  generatedAt         DateTime  @default(now())
+  uploadedToCarrier   Boolean   @default(false)
+  uploadedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@index([shipmentId])
+  @@index([productId])
+}
+
+// ============================================================
+// SYNC & AUDIT LOGS
+// ============================================================
+
+model ApiSyncLog {
+  id            String    @id @default(cuid())
+  vendorId      String?
+  source        String    // shopify_webhook, api_sync, manual
+  eventType     String    // products/create, orders/create, etc.
+  rawPayload    Json?
+  parsedData    Json?
+  status        String    @default("success") // success, error, skipped
+  errorMessage  String?
+  createdAt     DateTime  @default(now())
+
+  @@index([vendorId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model LabelLog {
+  id                  String    @id @default(cuid())
+  shipmentId          String?
+  trackingNumber      String?
+  action              String    // generated, voided, regenerated
+  carrier             Carrier?
+  carrierAccount      String?
+  labelUrl            String?
+  reason              String?
+  performedBy         String?
+  createdAt           DateTime  @default(now())
+
+  @@index([shipmentId])
+  @@index([trackingNumber])
+}
