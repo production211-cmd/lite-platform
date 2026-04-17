@@ -1,22 +1,67 @@
 /**
  * App.tsx — Layout Route Pattern
  * ===============================
- * Per Perplexity critique (Mistake 4A):
  * Three separate layout components as nested route parents.
- * NO conditional layout checks — each shell is its own route tree.
- *
- * - /             → AdminShell (RETAILER_LT)
- * - /vendor/*     → VendorShell (VENDOR_USER, full sidebar)
- * - /vendor/portal/* → VendorPortalShell (VENDOR, stripped layout)
- * - /login        → Login page (public)
  */
 
+import React from "react";
 import { Route, Switch, useLocation, Redirect } from "wouter";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AdminShell } from "@/layouts/AdminShell";
 import { VendorShell } from "@/layouts/VendorShell";
 import { VendorPortalShell } from "@/layouts/VendorPortalShell";
 import Login from "@/pages/Login";
+
+// Error Boundary to catch silent React crashes
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("ErrorBoundary caught:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, fontFamily: "monospace" }}>
+          <h1 style={{ color: "red" }}>Something went wrong</h1>
+          <pre style={{ whiteSpace: "pre-wrap", color: "#333" }}>
+            {this.state.error?.message}
+          </pre>
+          <pre style={{ whiteSpace: "pre-wrap", color: "#666", fontSize: 12 }}>
+            {this.state.error?.stack}
+          </pre>
+          <button
+            onClick={() => {
+              localStorage.clear();
+              window.location.href = "/";
+            }}
+            style={{ marginTop: 20, padding: "8px 16px", cursor: "pointer" }}
+          >
+            Clear session & reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function getHomeRoute(isRetailer: boolean, isVendorFull: boolean, isVendorPortal: boolean): string {
+  if (isVendorPortal) return "/vendor/portal";
+  if (isVendorFull) return "/vendor";
+  return "/";
+}
 
 function AppRouter() {
   const { user, isAuthenticated, isLoading, isRetailer, isVendorFull, isVendorPortal } = useAuth();
@@ -41,53 +86,25 @@ function AppRouter() {
     return <Login />;
   }
 
-  // Authenticated → route to appropriate shell based on role
-  // Vendor portal-only users trying to access non-portal routes → redirect
-  if (isVendorPortal && !location.startsWith("/vendor/portal")) {
-    return <Redirect to="/vendor/portal" />;
+  // Role-based shell rendering
+  if (isVendorPortal) {
+    return <VendorPortalShell />;
   }
 
-  // Vendor full users trying to access admin routes → redirect
-  if (isVendorFull && !location.startsWith("/vendor")) {
-    return <Redirect to="/vendor" />;
+  if (isVendorFull) {
+    return <VendorShell />;
   }
 
-  // Retailer users trying to access vendor routes → redirect
-  if (isRetailer && location.startsWith("/vendor")) {
-    return <Redirect to="/" />;
-  }
-
-  return (
-    <Switch>
-      {/* Vendor Portal Shell — stripped layout, no sidebar */}
-      {/* MUST be before /vendor/* to match first */}
-      <Route path="/vendor/portal/:rest*">
-        <VendorPortalShell />
-      </Route>
-      <Route path="/vendor/portal">
-        <VendorPortalShell />
-      </Route>
-
-      {/* Vendor Shell — full sidebar */}
-      <Route path="/vendor/:rest*">
-        <VendorShell />
-      </Route>
-      <Route path="/vendor">
-        <VendorShell />
-      </Route>
-
-      {/* Admin Shell — full sidebar (default for RETAILER_LT) */}
-      <Route path="/:rest*">
-        <AdminShell />
-      </Route>
-    </Switch>
-  );
+  // Default: RETAILER_LT → AdminShell
+  return <AdminShell />;
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRouter />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppRouter />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

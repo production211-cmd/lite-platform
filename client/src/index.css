@@ -5,7 +5,7 @@
  * Heading font: "Cinzel", serif (small-caps, luxury)
  * Sidebar: #232323, Active: #3a3a3a, Width: w-72 (288px)
  * Page bg: #F5F6F7, Cards: white, Borders: #e5e7eb
- * Store badge: #1e3a5f, Icons: Lucide React
+ * Store badge: green bg (#22c55e), Icons: Lucide React
  */
 
 :root {
@@ -41,12 +41,19 @@
   --sidebar-active: #3a3a3a;
   --sidebar-text: #ffffff;
   --sidebar-muted: #9ca3af;
-  --sidebar-width: 288px;
+  --sidebar-width: 240px;
   --sidebar-collapsed-width: 72px;
 
   /* Brand */
   --brand-blue: #1e3a5f;
   --brand-gold: #c8a45c;
+
+  /* KPI border colors */
+  --kpi-green: #22c55e;
+  --kpi-blue: #3b82f6;
+  --kpi-purple: #8b5cf6;
+  --kpi-orange: #f59e0b;
+  --kpi-pink: #ec4899;
 }
 
 * {
@@ -93,6 +100,16 @@ h1, h2, h3, h4, h5, h6 {
 .small-caps { font-variant: small-caps; letter-spacing: 0.05em; }
 
 /* Status badge colors */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: "Nunito Sans", sans-serif;
+  white-space: nowrap;
+}
 .status-pending { background-color: #fef3c7; color: #92400e; }
 .status-processing { background-color: #dbeafe; color: #1e40af; }
 .status-delivered { background-color: #d1fae5; color: #065f46; }
@@ -105,8 +122,9 @@ h1, h2, h3, h4, h5, h6 {
 .status-danger { background-color: #fee2e2; color: #991b1b; }
 .status-info { background-color: #dbeafe; color: #1e40af; }
 .status-neutral { background-color: #f3f4f6; color: #6b7280; }
+.status-authorized { background-color: #f3f4f6; color: #6b7280; }
 
-/* KPI Card */
+/* KPI Card — LEFT colored border style (matching reference) */
 .kpi-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -116,14 +134,127 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
-.kpi-card::after {
+.kpi-card::before {
   content: '';
   position: absolute;
+  top: 0;
+  left: 0;
   bottom: 0;
+  width: 4px;
+  background: var(--kpi-color, var(--kpi-green));
+}
+
+/* KPI card color variants */
+.kpi-green { --kpi-color: var(--kpi-green); }
+.kpi-blue { --kpi-color: var(--kpi-blue); }
+.kpi-purple { --kpi-color: var(--kpi-purple); }
+.kpi-orange { --kpi-color: var(--kpi-orange); }
+.kpi-pink { --kpi-color: var(--kpi-pink); }
+
+/* KPI Card — TOP colored border variant (for analytics page) */
+.kpi-card-top {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: var(--success);
+  height: 4px;
+  background: var(--kpi-color, var(--kpi-green));
+}
+
+/* Vendor color pills */
+.vendor-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
+}
+
+/* Tab bar styling */
+.tab-bar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tab-item {
+  padding: 6px 16px;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--foreground);
+  font-family: "Nunito Sans", sans-serif;
+}
+
+.tab-item:hover {
+  background: var(--muted);
+}
+
+.tab-item.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* View button (green with eye icon) */
+.btn-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: #22c55e;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border: none;
+  font-family: "Nunito Sans", sans-serif;
+}
+
+.btn-view:hover {
+  background-color: #16a34a;
+}
+
+/* Quick stats card */
+.quick-stat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.quick-stat .stat-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--card-foreground);
+  font-family: "Nunito Sans", sans-serif;
+}
+
+.quick-stat .stat-label {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin-top: 0.25rem;
+  font-family: "Nunito Sans", sans-serif;
 }
 
 /* Data table styling */
@@ -159,6 +290,74 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--secondary);
 }
 
+/* Page header pattern */
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+.page-header h1 {
+  font-family: "Cinzel", serif;
+  font-size: 1.5rem;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  color: var(--card-foreground);
+}
+
+.page-header p {
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  margin-top: 0.25rem;
+}
+
+/* Section heading */
+.section-heading {
+  font-family: "Cinzel", serif;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  font-size: 1.125rem;
+  color: var(--card-foreground);
+}
+
+/* Search bar */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  width: 100%;
+}
+
+.search-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.875rem;
+  font-family: "Nunito Sans", sans-serif;
+  color: var(--foreground);
+  background: transparent;
+}
+
+.search-bar input::placeholder {
+  color: var(--muted-foreground);
+}
+
+/* Filter dropdown */
+.filter-select {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-family: "Nunito Sans", sans-serif;
+  color: var(--foreground);
+  background: white;
+  cursor: pointer;
+  appearance: auto;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
@@ -186,4 +385,51 @@ h1, h2, h3, h4, h5, h6 {
 .card-hover:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transform: translateY(-1px);
+}
+
+/* Action required alert cards */
+.action-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.action-card .action-icon {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.action-card .action-count {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: "Nunito Sans", sans-serif;
+}
+
+.action-card .action-label {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  font-family: "Nunito Sans", sans-serif;
+}
+
+.action-card .action-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.action-card .action-link:hover {
+  color: var(--foreground);
 }

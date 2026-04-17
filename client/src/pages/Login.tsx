@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocation } from "wouter";
 
 export default function Login() {
   const { login } = useAuth();
+  const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -14,6 +16,8 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
+      // Navigate to home — App.tsx will redirect to the correct shell based on role
+      navigate("/");
     } catch (err: any) {
       setError(err.message || "Invalid credentials");
     }
@@ -91,7 +95,7 @@ export default function Login() {
         <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
           <p className="text-xs font-semibold text-gray-600 mb-2 font-body">Demo Accounts:</p>
           <div className="space-y-1.5 text-xs text-gray-500 font-body">
-            <p><strong>Admin:</strong> syenel@lordandtaylor.com / LiteAdmin2026!</p>
+            <p><strong>Admin:</strong> ops@lordandtaylor.com / LiteAdmin2026!</p>
             <p><strong>Vendor:</strong> vendor@julian.com / VendorPass2026!</p>
           </div>
         </div>

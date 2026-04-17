@@ -12,8 +12,11 @@ import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import Dashboard from "@/pages/Dashboard";
 import Vendors from "@/pages/Vendors";
+import VendorDetail from "@/pages/VendorDetail";
+import VendorOnboarding from "@/pages/VendorOnboarding";
 import Products from "@/pages/Products";
 import Orders from "@/pages/Orders";
+import OrderDetail from "@/pages/OrderDetail";
 import Shipping from "@/pages/Shipping";
 import Messages from "@/pages/Messages";
 import Finance from "@/pages/Finance";
@@ -24,8 +27,11 @@ import PendingProducts from "@/pages/PendingProducts";
 import Payouts from "@/pages/Payouts";
 import Deductions from "@/pages/Deductions";
 import VendorBalances from "@/pages/VendorBalances";
+import Settings from "@/pages/Settings";
+import QueueMonitor from "@/pages/QueueMonitor";
+import Issues from "@/pages/Issues";
 import {
-  Ads, Marketing, SettingsPage, Issues,
+  Ads, Marketing,
   ProductPricing, ProductEnrichment,
   ShippingCosts, ShippingSettings,
 } from "@/pages/Placeholder";
@@ -45,29 +51,41 @@ function AdminContent() {
         <main className="flex-1 overflow-y-auto">
           <Switch>
             <Route path="/" component={Dashboard} />
+            {/* Vendors */}
             <Route path="/vendors" component={Vendors} />
+            <Route path="/vendors/onboard" component={VendorOnboarding} />
             <Route path="/vendors/performance">{() => <div className="p-8"><h2 className="font-heading small-caps text-2xl">Vendor Performance</h2><p className="text-gray-500 mt-2">Coming soon</p></div>}</Route>
-            <Route path="/vendors/:id">{() => <div className="p-8"><h2 className="font-heading small-caps text-2xl">Vendor Detail</h2></div>}</Route>
+            <Route path="/vendors/:id" component={VendorDetail} />
+            {/* Products */}
             <Route path="/products" component={Products} />
             <Route path="/products/pending" component={PendingProducts} />
             <Route path="/products/pricing" component={ProductPricing} />
             <Route path="/products/enrichment" component={ProductEnrichment} />
+            {/* Orders */}
             <Route path="/orders" component={Orders} />
             <Route path="/orders/pending" component={PendingOrders} />
             <Route path="/orders/returns" component={Returns} />
             <Route path="/orders/issues" component={Issues} />
             <Route path="/orders/analytics" component={OrderAnalytics} />
+            <Route path="/orders/:id" component={OrderDetail} />
+            {/* Shipping */}
             <Route path="/shipping" component={Shipping} />
             <Route path="/shipping/costs" component={ShippingCosts} />
             <Route path="/shipping/settings" component={ShippingSettings} />
+            {/* Messages */}
             <Route path="/messages" component={Messages} />
+            {/* Finance */}
             <Route path="/finance" component={Finance} />
             <Route path="/finance/payouts" component={Payouts} />
             <Route path="/finance/deductions" component={Deductions} />
             <Route path="/finance/balances" component={VendorBalances} />
+            {/* Ads & Marketing */}
             <Route path="/ads" component={Ads} />
             <Route path="/marketing" component={Marketing} />
-            <Route path="/settings" component={SettingsPage} />
+            {/* Settings & Admin */}
+            <Route path="/settings" component={Settings} />
+            <Route path="/admin/queues" component={QueueMonitor} />
+            {/* 404 */}
             <Route>
               <div className="flex items-center justify-center h-[60vh]">
                 <p className="text-gray-500">Page not found</p>

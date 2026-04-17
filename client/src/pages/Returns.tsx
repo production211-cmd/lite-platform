@@ -1,100 +1,191 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { api } from "@/lib/api";
-import { formatCurrency, timeAgo } from "@/lib/utils";
-import { TopBar } from "@/components/TopBar";
-import { KPICard, StatusBadge, Pagination } from "@/components/ui-components";
-import { RotateCcw, Clock, CheckCircle, DollarSign, Package, Search } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import { Search, Eye, RotateCcw, Clock, Package, CheckCircle, DollarSign } from "lucide-react";
+
+const STATUS_TABS = [
+  { key: "all", label: "All" },
+  { key: "INITIATED", label: "Initiated" },
+  { key: "IN_TRANSIT", label: "In Transit" },
+  { key: "RECEIVED_WAREHOUSE", label: "Received" },
+  { key: "INSPECTING", label: "Inspecting" },
+  { key: "APPROVED", label: "Approved" },
+  { key: "REFUNDED", label: "Refunded" },
+];
 
 export default function Returns() {
   const [returns, setReturns] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(null);
-  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("all");
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const params: Record<string, string> = { page: String(page), limit: "20" };
-        if (statusFilter) params.status = statusFilter;
-        const [data, s] = await Promise.all([
-          api.getReturns(params),
-          api.getReturnStats(),
-        ]);
-        setReturns(data.returns);
-        setTotal(data.total);
-        setStats(s);
-      } catch (err) {
-        console.error(err);
-      }
+    api.getReturns().then((data: any) => {
+      const list = Array.isArray(data) ? data : data?.returns || [];
+      setReturns(list);
       setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const filtered = useMemo(() => {
+    let result = returns;
+    if (activeTab !== "all") result = result.filter((r) => r.status === activeTab);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((r) =>
+        r.vendorOrder?.order?.orderNumber?.toLowerCase().includes(q) ||
+        r.vendor?.name?.toLowerCase().includes(q) ||
+        r.reason?.toLowerCase().includes(q)
+      );
     }
-    load();
-  }, [page, statusFilter]);
+    return result;
+  }, [returns, activeTab, search]);
+
+  const tabCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: returns.length };
+    STATUS_TABS.forEach((t) => {
+      if (t.key !== "all") counts[t.key] = returns.filter((r) => r.status === t.key).length;
+    });
+    return counts;
+  }, [returns]);
+
+  const stats = useMemo(() => ({
+    total: returns.length,
+    initiated: returns.filter((r) => r.status === "INITIATED").length,
+    inTransit: returns.filter((r) => r.status === "IN_TRANSIT").length,
+    inspecting: returns.filter((r) => r.status === "INSPECTING").length,
+    totalRefunds: returns.reduce((sum, r) => sum + (r.refundAmount || 0), 0),
+  }), [returns]);
+
+  const statusColor = (status: string) => {
+    const s = status?.toUpperCase();
+    if (s === "INITIATED") return "status-pending";
+    if (s === "IN_TRANSIT") return "status-processing";
+    if (s === "RECEIVED_WAREHOUSE" || s === "INSPECTING") return "status-info";
+    if (s === "APPROVED" || s === "REFUNDED") return "status-delivered";
+    return "status-neutral";
+  };
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-gray-500 mt-4 font-body">Loading returns...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <TopBar title="Returns" subtitle={`${total} returns`} />
-      <div className="p-6 space-y-6 animate-fade-in">
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <KPICard title="Total Returns" value={stats?.total || 0} format="number" icon={RotateCcw} iconColor="text-rose-600" />
-          <KPICard title="Initiated" value={stats?.initiated || 0} format="number" icon={Clock} iconColor="text-amber-600" />
-          <KPICard title="In Transit" value={stats?.inTransit || 0} format="number" icon={Package} iconColor="text-blue-600" />
-          <KPICard title="Inspecting" value={stats?.inspecting || 0} format="number" icon={Search} iconColor="text-violet-600" />
-          <KPICard title="Total Refunds" value={stats?.totalRefunds || 0} format="currency" icon={DollarSign} iconColor="text-emerald-600" />
-        </div>
+    <div className="p-6 space-y-5 animate-fade-in">
+      {/* Page Header */}
+      <div className="page-header">
+        <h1>Returns</h1>
+        <p>Manage product returns and refund processing</p>
+      </div>
 
-        <div className="flex items-center gap-3">
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-white"
+      {/* Quick Stats */}
+      <div className="grid grid-cols-5 gap-3">
+        <div className="kpi-card kpi-purple">
+          <RotateCcw size={16} className="text-purple-500 mb-1" />
+          <p className="text-2xl font-bold font-body">{stats.total}</p>
+          <p className="text-xs text-gray-500 font-body">Total Returns</p>
+        </div>
+        <div className="kpi-card kpi-orange">
+          <Clock size={16} className="text-orange-500 mb-1" />
+          <p className="text-2xl font-bold font-body">{stats.initiated}</p>
+          <p className="text-xs text-gray-500 font-body">Initiated</p>
+        </div>
+        <div className="kpi-card kpi-blue">
+          <Package size={16} className="text-blue-500 mb-1" />
+          <p className="text-2xl font-bold font-body">{stats.inTransit}</p>
+          <p className="text-xs text-gray-500 font-body">In Transit</p>
+        </div>
+        <div className="kpi-card kpi-green">
+          <CheckCircle size={16} className="text-green-500 mb-1" />
+          <p className="text-2xl font-bold font-body">{stats.inspecting}</p>
+          <p className="text-xs text-gray-500 font-body">Inspecting</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <DollarSign size={16} className="text-emerald-500 mb-1" />
+          <p className="text-2xl font-bold font-body">{formatCurrency(stats.totalRefunds)}</p>
+          <p className="text-xs text-gray-500 font-body">Total Refunds</p>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="search-bar">
+        <Search size={16} className="text-gray-400 flex-shrink-0" />
+        <input
+          type="text"
+          placeholder="Search by order #, vendor, reason..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* Tab Bar */}
+      <div className="tab-bar">
+        {STATUS_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`tab-item ${activeTab === tab.key ? "active" : ""}`}
           >
-            <option value="">All Statuses</option>
-            <option value="INITIATED">Initiated</option>
-            <option value="IN_TRANSIT">In Transit</option>
-            <option value="RECEIVED_WAREHOUSE">Received</option>
-            <option value="INSPECTING">Inspecting</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REFUNDED">Refunded</option>
-          </select>
-        </div>
+            {tab.label} ({tabCounts[tab.key] || 0})
+          </button>
+        ))}
+      </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-2 border-slate-200 border-t-[#c8a45c] rounded-full animate-spin" />
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden">
-            <table className="w-full data-table">
-              <thead>
-                <tr className="bg-slate-50/80">
-                  <th>Order</th>
-                  <th>Vendor</th>
-                  <th>Reason</th>
-                  <th>Refund Amount</th>
-                  <th>Status</th>
-                  <th>Initiated</th>
-                </tr>
-              </thead>
-              <tbody>
-                {returns.map((r: any) => (
-                  <tr key={r.id}>
-                    <td className="text-xs font-medium text-[#c8a45c]">{r.vendorOrder?.order?.orderNumber || "—"}</td>
-                    <td className="text-xs">{r.vendor?.name}</td>
-                    <td className="text-xs">{r.reason || "—"}</td>
-                    <td className="text-xs font-medium">{r.refundAmount ? formatCurrency(r.refundAmount) : "—"}</td>
-                    <td><StatusBadge status={r.status} size="xs" /></td>
-                    <td className="text-xs text-slate-500">{timeAgo(r.initiatedAt || r.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <Pagination page={page} total={total} limit={20} onPageChange={setPage} />
+      {/* Returns Table */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Vendor</th>
+              <th>Reason</th>
+              <th>Refund Amount</th>
+              <th>Status</th>
+              <th>Initiated</th>
+              <th className="w-20"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r: any) => (
+              <tr key={r.id}>
+                <td className="text-sm font-semibold font-body">{r.vendorOrder?.order?.orderNumber || "—"}</td>
+                <td className="text-sm font-body">{r.vendor?.name || "—"}</td>
+                <td className="text-sm font-body">{r.reason || "—"}</td>
+                <td className="text-sm font-semibold font-body">{r.refundAmount ? formatCurrency(r.refundAmount) : "—"}</td>
+                <td>
+                  <span className={`status-badge ${statusColor(r.status)}`}>
+                    {r.status?.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                  </span>
+                </td>
+                <td className="text-xs text-gray-500 font-body">{formatDate(r.initiatedAt || r.createdAt)}</td>
+                <td>
+                  <button className="btn-view">
+                    <Eye size={12} />
+                    View
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} className="text-center py-12 text-gray-400 font-body">No returns found</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
