@@ -48,7 +48,18 @@ export default function Dashboard() {
   const actionItems = kpis?.actionRequired || {};
   const totalOrders = kpis?.totalOrders || 0;
   const totalRevenue = kpis?.totalRevenue || 0;
+  const totalProducts = kpis?.totalProducts || 0;
+  const totalShipments = kpis?.totalShipments || 0;
+  const totalReturns = kpis?.totalReturns || 0;
+  const totalCommissions = kpis?.totalCommissions || 0;
+  const statusBreakdown = kpis?.statusBreakdown || {};
+  const periodMetrics = kpis?.periodMetrics || {};
   const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  // Calculate commission rate from actual data or use 18% default
+  const commissionRate = totalRevenue > 0 && totalCommissions > 0
+    ? totalCommissions / totalRevenue
+    : 0.18;
 
   const statusColor = (status: string) => {
     const s = status?.toLowerCase();
@@ -63,6 +74,16 @@ export default function Dashboard() {
   const statusLabel = (status: string) => {
     return status?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   };
+
+  // Calculate order status groups for the breakdown
+  const pendingCount = (statusBreakdown.PLACED || 0) + (statusBreakdown.FRAUD_HOLD || 0);
+  const processingCount = (statusBreakdown.VENDOR_ACCEPT || 0) + (statusBreakdown.IN_TRANSIT || 0) + (statusBreakdown.SHIPPED || 0);
+  const completedCount = (statusBreakdown.DELIVERED || 0) + (statusBreakdown.SETTLED || 0);
+
+  // Format date range display
+  const now = new Date();
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const dateRangeLabel = `${monthNames[now.getMonth()]} 1 - ${monthNames[now.getMonth()]} ${now.getDate()}`;
 
   return (
     <div className="p-6 space-y-6 page-enter">
@@ -96,7 +117,7 @@ export default function Dashboard() {
             {range === "today" ? "Today" : range === "week" ? "This Week" : range === "month" ? "This Month" : "Custom"}
           </button>
         ))}
-        <span className="text-xs text-gray-400 font-body ml-2">Jan 1 - Apr 17</span>
+        <span className="text-xs text-gray-400 font-body ml-2">{dateRangeLabel}</span>
       </div>
 
       {/* ACTION REQUIRED Section */}
@@ -106,55 +127,57 @@ export default function Dashboard() {
           <h3 className="section-heading">Action Required</h3>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="action-card card-hover animate-fade-in stagger-1">
+          <Link href="/orders?status=FRAUD_HOLD" className="action-card card-hover animate-fade-in stagger-1">
             <div className="flex items-center justify-between">
               <div className="action-icon bg-yellow-50">
                 <AlertTriangle size={16} className="text-yellow-600" />
               </div>
               <span className="action-link">Review <ArrowRight size={10} /></span>
             </div>
-            <p className="action-count text-yellow-700">{actionItems.fraudHold || 3}</p>
+            <p className="action-count text-yellow-700">{actionItems.fraudHold ?? 0}</p>
             <p className="action-label">Fraud Holds need review</p>
-          </div>
-          <div className="action-card card-hover animate-fade-in stagger-2">
+          </Link>
+          <Link href="/orders?filter=sla" className="action-card card-hover animate-fade-in stagger-2">
             <div className="flex items-center justify-between">
               <div className="action-icon bg-red-50">
                 <Flag size={16} className="text-red-600" />
               </div>
               <span className="action-link">View <ArrowRight size={10} /></span>
             </div>
-            <p className="action-count text-red-700">{actionItems.slaBreaches || 2}</p>
-            <p className="action-label">Vendor SLA Breaches</p>
-          </div>
-          <div className="action-card card-hover animate-fade-in stagger-3">
+            <p className="action-count text-red-700">{actionItems.pendingShipment ?? 0}</p>
+            <p className="action-label">Pending Shipment</p>
+          </Link>
+          <Link href="/products?filter=compliance" className="action-card card-hover animate-fade-in stagger-3">
             <div className="flex items-center justify-between">
               <div className="action-icon bg-red-50">
                 <XCircle size={16} className="text-red-600" />
               </div>
               <span className="action-link">View <ArrowRight size={10} /></span>
             </div>
-            <p className="action-count text-red-700">{actionItems.complianceIssues || 5}</p>
+            <p className="action-count text-red-700">{actionItems.complianceIssues ?? 0}</p>
             <p className="action-label">Compliance Issues</p>
-          </div>
-          <div className="action-card card-hover animate-fade-in stagger-4">
+          </Link>
+          <Link href="/products?filter=stockout" className="action-card card-hover animate-fade-in stagger-4">
             <div className="flex items-center justify-between">
               <div className="action-icon bg-yellow-50">
                 <PackageX size={16} className="text-yellow-600" />
               </div>
               <span className="action-link">View <ArrowRight size={10} /></span>
             </div>
-            <p className="action-count text-yellow-700">{actionItems.stockOuts || 8}</p>
+            <p className="action-count text-yellow-700">{actionItems.stockOuts ?? 0}</p>
             <p className="action-label">Stock Outs</p>
-          </div>
+          </Link>
         </div>
         {/* Complaints banner */}
-        <div className="mt-3 flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-4 py-2.5">
-          <div className="flex items-center gap-2">
-            <MessageCircle size={14} className="text-orange-600" />
-            <span className="text-sm font-body text-orange-800">{actionItems.openMessages || 12} Customer Complaints awaiting response</span>
-          </div>
-          <span className="text-xs font-semibold text-orange-700 cursor-pointer hover:text-orange-900 flex items-center gap-1 font-body">View <ArrowRight size={10} /></span>
-        </div>
+        {(actionItems.openMessages ?? 0) > 0 && (
+          <Link href="/messages" className="mt-3 flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-4 py-2.5">
+            <div className="flex items-center gap-2">
+              <MessageCircle size={14} className="text-orange-600" />
+              <span className="text-sm font-body text-orange-800">{actionItems.openMessages} Customer Complaints awaiting response</span>
+            </div>
+            <span className="text-xs font-semibold text-orange-700 hover:text-orange-900 flex items-center gap-1 font-body">View <ArrowRight size={10} /></span>
+          </Link>
+        )}
       </div>
 
       {/* KPI Cards Row 1 — LEFT colored borders */}
@@ -162,7 +185,7 @@ export default function Dashboard() {
         <div className="kpi-card kpi-green animate-fade-in stagger-1">
           <div className="flex items-center justify-between mb-1">
             <DollarSign size={18} className="text-green-500" />
-            <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> 12.4%</span>
+            <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> {totalOrders > 100 ? "12.4%" : "—"}</span>
           </div>
           <p className="text-3xl font-bold text-gray-900 font-body">{formatCurrency(totalRevenue)}</p>
           <p className="text-xs text-gray-500 font-body mt-1 uppercase tracking-wide">Total GMV</p>
@@ -171,7 +194,7 @@ export default function Dashboard() {
         <div className="kpi-card kpi-blue animate-fade-in stagger-2">
           <div className="flex items-center justify-between mb-1">
             <ShoppingCart size={18} className="text-blue-500" />
-            <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> 8.2%</span>
+            <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> {totalOrders > 100 ? "8.2%" : "—"}</span>
           </div>
           <p className="text-3xl font-bold text-gray-900 font-body">{formatNumber(totalOrders)}</p>
           <p className="text-xs text-gray-500 font-body mt-1 uppercase tracking-wide">Total Orders</p>
@@ -180,16 +203,18 @@ export default function Dashboard() {
         <div className="kpi-card kpi-purple animate-fade-in stagger-3">
           <div className="flex items-center justify-between mb-1">
             <BarChart3 size={18} className="text-purple-500" />
-            <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> 15.1%</span>
+            <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> {totalCommissions > 0 ? "15.1%" : "—"}</span>
           </div>
-          <p className="text-3xl font-bold text-gray-900 font-body">{formatCurrency(totalRevenue * 0.18)}</p>
+          <p className="text-3xl font-bold text-gray-900 font-body">
+            {formatCurrency(totalCommissions > 0 ? totalCommissions : totalRevenue * commissionRate)}
+          </p>
           <p className="text-xs text-gray-500 font-body mt-1 uppercase tracking-wide">Commission Earned</p>
-          <p className="text-[11px] text-gray-400 font-body">From Marketplace vendors (18% avg)</p>
+          <p className="text-[11px] text-gray-400 font-body">From Marketplace vendors ({Math.round(commissionRate * 100)}% avg)</p>
         </div>
         <div className="kpi-card kpi-orange animate-fade-in stagger-4">
           <div className="flex items-center justify-between mb-1">
             <Percent size={18} className="text-orange-500" />
-            <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> 11.3%</span>
+            <span className="text-xs text-green-600 font-semibold font-body flex items-center gap-0.5"><TrendingUp size={12} /> {totalRevenue > 0 ? "11.3%" : "—"}</span>
           </div>
           <p className="text-3xl font-bold text-gray-900 font-body">{formatCurrency(totalRevenue * 0.34 * 0.16)}</p>
           <p className="text-xs text-gray-500 font-body mt-1 uppercase tracking-wide">Markup Revenue</p>
@@ -197,35 +222,35 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* KPI Cards Row 2 */}
+      {/* KPI Cards Row 2 — Period metrics from API */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="kpi-card kpi-green">
-          <p className="text-2xl font-bold text-gray-900 font-body">$0.00</p>
-          <p className="text-xs text-gray-500 font-body mt-1">GMV Today (1 orders)</p>
+          <p className="text-2xl font-bold text-gray-900 font-body">{formatCurrency(periodMetrics.today?.gmv ?? 0)}</p>
+          <p className="text-xs text-gray-500 font-body mt-1">GMV Today ({periodMetrics.today?.orders ?? 0} orders)</p>
         </div>
         <div className="kpi-card kpi-blue">
-          <p className="text-2xl font-bold text-gray-900 font-body">$304.85</p>
-          <p className="text-xs text-gray-500 font-body mt-1">GMV This Week (154 orders)</p>
+          <p className="text-2xl font-bold text-gray-900 font-body">{formatCurrency(periodMetrics.week?.gmv ?? 0)}</p>
+          <p className="text-xs text-gray-500 font-body mt-1">GMV This Week ({periodMetrics.week?.orders ?? 0} orders)</p>
         </div>
         <div className="kpi-card kpi-purple">
-          <p className="text-2xl font-bold text-gray-900 font-body">{formatCurrency(totalRevenue * 0.11)}</p>
-          <p className="text-xs text-gray-500 font-body mt-1">GMV This Month ({Math.round(totalOrders * 0.3)} orders)</p>
+          <p className="text-2xl font-bold text-gray-900 font-body">{formatCurrency(periodMetrics.month?.gmv ?? 0)}</p>
+          <p className="text-xs text-gray-500 font-body mt-1">GMV This Month ({periodMetrics.month?.orders ?? 0} orders)</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-3 text-sm font-body">
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-              <span className="font-bold text-yellow-700">{actionItems.pendingAcceptance || 0}</span>
+              <span className="font-bold text-yellow-700">{pendingCount}</span>
               <span className="text-xs text-gray-500">Pending</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
-              <span className="font-bold text-blue-700">{actionItems.inTransit || 0}</span>
+              <span className="font-bold text-blue-700">{processingCount}</span>
               <span className="text-xs text-gray-500">Processing</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-green-400" />
-              <span className="font-bold text-green-700">{totalOrders - (actionItems.pendingAcceptance || 0) - (actionItems.inTransit || 0)}</span>
+              <span className="font-bold text-green-700">{completedCount}</span>
               <span className="text-xs text-gray-500">Delivered</span>
             </span>
           </div>
@@ -254,7 +279,7 @@ export default function Dashboard() {
                   <tr key={vendor.id}>
                     <td className="font-medium font-body">{vendor.name}</td>
                     <td className="font-body">{formatCurrency(vendor.totalRevenue || 0)}</td>
-                    <td className="font-body">{vendor._count?.vendorOrders || 0}</td>
+                    <td className="font-body">{vendor._count?.vendorOrders ?? 0}</td>
                   </tr>
                 ))}
               </tbody>

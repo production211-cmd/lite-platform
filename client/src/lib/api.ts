@@ -126,6 +126,11 @@ class ApiClient {
     return this.request<any>("/dashboard/revenue-chart");
   }
 
+  getActivity(params?: { limit?: string; page?: string }) {
+    const qs = new URLSearchParams(params || {}).toString();
+    return this.request<any>(`/activity${qs ? `?${qs}` : ""}`);
+  }
+
   // ============================================================
   // Vendors
   // ============================================================

@@ -3,10 +3,10 @@
  * ==================================================
  * Design: Left-nav with 3 groups (Organization / Integrations / Security).
  * Role-gated: Security group only visible to admins.
- * Avoids junk-drawer anti-pattern.
+ * Persists settings to localStorage with toast feedback.
  */
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import {
@@ -16,6 +16,96 @@ import {
   Key, Database,
 } from "lucide-react";
 
+// Simple toast helper
+const showToast = (msg: string, type: "success" | "error" = "success") => {
+  const el = document.createElement("div");
+  el.textContent = msg;
+  el.className = `fixed bottom-6 right-6 z-50 ${type === "success" ? "bg-gray-900" : "bg-red-600"} text-white px-5 py-3 rounded-lg shadow-lg text-sm font-body`;
+  el.style.animation = "fadeIn 0.2s ease-out";
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity 0.3s"; }, 2000);
+  setTimeout(() => el.remove(), 2500);
+};
+
+// Settings storage helpers
+const SETTINGS_KEY = "lite_platform_settings";
+
+interface PlatformSettings {
+  general: {
+    platformName: string;
+    supportEmail: string;
+    defaultCurrency: string;
+    timezone: string;
+    commissionRate: number;
+  };
+  branding: {
+    primaryColor: string;
+    accentColor: string;
+  };
+  shopify: {
+    autoSyncOrders: boolean;
+    autoSyncProducts: boolean;
+    autoSyncInventory: boolean;
+    autoFulfillOrders: boolean;
+  };
+  notifications: {
+    [key: string]: { email: boolean; slack: boolean };
+  };
+  security: {
+    twoFactor: boolean;
+    sessionTimeout: boolean;
+    ipWhitelist: boolean;
+    auditLogging: boolean;
+  };
+}
+
+const DEFAULT_SETTINGS: PlatformSettings = {
+  general: {
+    platformName: "Lord & Taylor Marketplace",
+    supportEmail: "marketplace@lordandtaylor.com",
+    defaultCurrency: "GBP",
+    timezone: "Europe/London",
+    commissionRate: 18,
+  },
+  branding: {
+    primaryColor: "#1a1a2e",
+    accentColor: "#c8a45c",
+  },
+  shopify: {
+    autoSyncOrders: true,
+    autoSyncProducts: true,
+    autoSyncInventory: false,
+    autoFulfillOrders: true,
+  },
+  notifications: {
+    newOrder: { email: true, slack: true },
+    orderShipped: { email: true, slack: false },
+    returnRequested: { email: true, slack: true },
+    slaBreach: { email: true, slack: true },
+    settlementCompleted: { email: true, slack: false },
+    vendorOnboarding: { email: true, slack: false },
+    lowStock: { email: false, slack: true },
+  },
+  security: {
+    twoFactor: true,
+    sessionTimeout: true,
+    ipWhitelist: false,
+    auditLogging: true,
+  },
+};
+
+function loadSettings(): PlatformSettings {
+  try {
+    const stored = localStorage.getItem(SETTINGS_KEY);
+    if (stored) return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+  } catch {}
+  return DEFAULT_SETTINGS;
+}
+
+function saveSettings(settings: PlatformSettings) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
 interface SettingsGroup {
   label: string;
   sections: { key: string; label: string; icon: any; adminOnly?: boolean }[];
@@ -24,6 +114,25 @@ interface SettingsGroup {
 export default function Settings() {
   const { user, isRetailer } = useAuth();
   const [activeSection, setActiveSection] = useState("general");
+  const [settings, setSettings] = useState<PlatformSettings>(loadSettings);
+  const [saving, setSaving] = useState(false);
+
+  const updateSettings = useCallback((section: keyof PlatformSettings, data: any) => {
+    setSettings((prev) => {
+      const updated = { ...prev, [section]: { ...prev[section], ...data } };
+      return updated;
+    });
+  }, []);
+
+  const handleSave = useCallback((section: string) => {
+    setSaving(true);
+    // Simulate brief save delay
+    setTimeout(() => {
+      saveSettings(settings);
+      setSaving(false);
+      showToast(`${section} settings saved successfully`);
+    }, 400);
+  }, [settings]);
 
   const groups: SettingsGroup[] = [
     {
@@ -112,37 +221,65 @@ export default function Settings() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Platform Name</label>
-                    <input type="text" defaultValue="Lord & Taylor Marketplace" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:ring-2 focus:ring-gray-300" />
+                    <input
+                      type="text"
+                      value={settings.general.platformName}
+                      onChange={(e) => updateSettings("general", { platformName: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Support Email</label>
-                    <input type="email" defaultValue="marketplace@lordandtaylor.com" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:ring-2 focus:ring-gray-300" />
+                    <input
+                      type="email"
+                      value={settings.general.supportEmail}
+                      onChange={(e) => updateSettings("general", { supportEmail: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Default Currency</label>
-                      <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body bg-white">
-                        <option>GBP (£)</option>
-                        <option>USD ($)</option>
-                        <option>EUR (€)</option>
+                      <select
+                        value={settings.general.defaultCurrency}
+                        onChange={(e) => updateSettings("general", { defaultCurrency: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body bg-white"
+                      >
+                        <option value="GBP">GBP (£)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="EUR">EUR (€)</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Timezone</label>
-                      <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body bg-white">
-                        <option>Europe/London (GMT)</option>
-                        <option>America/New_York (EST)</option>
-                        <option>Europe/Paris (CET)</option>
+                      <select
+                        value={settings.general.timezone}
+                        onChange={(e) => updateSettings("general", { timezone: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body bg-white"
+                      >
+                        <option value="Europe/London">Europe/London (GMT)</option>
+                        <option value="America/New_York">America/New_York (EST)</option>
+                        <option value="Europe/Paris">Europe/Paris (CET)</option>
                       </select>
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Default Commission Rate (%)</label>
-                    <input type="number" defaultValue="18" className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:ring-2 focus:ring-gray-300" />
+                    <input
+                      type="number"
+                      value={settings.general.commissionRate}
+                      onChange={(e) => updateSettings("general", { commissionRate: parseFloat(e.target.value) || 0 })}
+                      className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    />
                   </div>
                 </div>
-                <button className="mt-5 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold font-body hover:bg-gray-800 flex items-center gap-1.5">
-                  <Save size={12} /> Save Changes
+                <button
+                  onClick={() => handleSave("General")}
+                  disabled={saving}
+                  className="mt-5 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold font-body hover:bg-gray-800 flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {saving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
+                  {saving ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </div>
@@ -153,7 +290,12 @@ export default function Settings() {
             <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-bold font-heading">Team Members</h3>
-                <button className="px-3 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold font-body hover:bg-gray-800">+ Invite Member</button>
+                <button
+                  onClick={() => showToast("Team management coming soon")}
+                  className="px-3 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold font-body hover:bg-gray-800"
+                >
+                  + Invite Member
+                </button>
               </div>
               <div className="space-y-3">
                 {[
@@ -189,27 +331,45 @@ export default function Settings() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Logo</label>
-                  <div className="w-32 h-32 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center text-gray-400 text-xs font-body cursor-pointer hover:border-gray-400">
+                  <div
+                    onClick={() => showToast("Logo upload coming soon")}
+                    className="w-32 h-32 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center text-gray-400 text-xs font-body cursor-pointer hover:border-gray-400"
+                  >
                     Upload Logo
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Primary Color</label>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-gray-900 border border-gray-200" />
-                    <input type="text" defaultValue="#1a1a2e" className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-300" />
+                    <div className="w-8 h-8 rounded-lg border border-gray-200" style={{ backgroundColor: settings.branding.primaryColor }} />
+                    <input
+                      type="text"
+                      value={settings.branding.primaryColor}
+                      onChange={(e) => updateSettings("branding", { primaryColor: e.target.value })}
+                      className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    />
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Accent Color</label>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#c8a45c] border border-gray-200" />
-                    <input type="text" defaultValue="#c8a45c" className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-300" />
+                    <div className="w-8 h-8 rounded-lg border border-gray-200" style={{ backgroundColor: settings.branding.accentColor }} />
+                    <input
+                      type="text"
+                      value={settings.branding.accentColor}
+                      onChange={(e) => updateSettings("branding", { accentColor: e.target.value })}
+                      className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    />
                   </div>
                 </div>
               </div>
-              <button className="mt-5 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold font-body hover:bg-gray-800 flex items-center gap-1.5">
-                <Save size={12} /> Save Branding
+              <button
+                onClick={() => handleSave("Branding")}
+                disabled={saving}
+                className="mt-5 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold font-body hover:bg-gray-800 flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {saving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
+                {saving ? "Saving..." : "Save Branding"}
               </button>
             </div>
           )}
@@ -238,10 +398,16 @@ export default function Settings() {
                   ))}
                 </div>
                 <div className="flex items-center gap-2 mt-4">
-                  <button className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold font-body hover:bg-gray-50 flex items-center gap-1.5">
+                  <button
+                    onClick={() => showToast("Shopify sync initiated")}
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold font-body hover:bg-gray-50 flex items-center gap-1.5"
+                  >
                     <RefreshCw size={12} /> Sync Now
                   </button>
-                  <button className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold font-body hover:bg-gray-50 flex items-center gap-1.5">
+                  <button
+                    onClick={() => showToast("Shopify admin link coming soon")}
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold font-body hover:bg-gray-50 flex items-center gap-1.5"
+                  >
                     <ExternalLink size={12} /> Open Shopify Admin
                   </button>
                 </div>
@@ -250,20 +416,29 @@ export default function Settings() {
               <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
                 <h3 className="text-sm font-bold font-heading mb-4">Sync Settings</h3>
                 <div className="space-y-3">
-                  {[
-                    { label: "Auto-sync orders", desc: "Automatically import new Shopify orders", enabled: true },
-                    { label: "Auto-sync products", desc: "Push product changes to Shopify", enabled: true },
-                    { label: "Auto-sync inventory", desc: "Real-time inventory level updates", enabled: false },
-                    { label: "Auto-fulfill orders", desc: "Mark orders as fulfilled when shipped", enabled: true },
-                  ].map((item) => (
-                    <div key={item.label} className="flex items-center justify-between py-2.5 border-b border-gray-50">
+                  {([
+                    { key: "autoSyncOrders", label: "Auto-sync orders", desc: "Automatically import new Shopify orders" },
+                    { key: "autoSyncProducts", label: "Auto-sync products", desc: "Push product changes to Shopify" },
+                    { key: "autoSyncInventory", label: "Auto-sync inventory", desc: "Real-time inventory level updates" },
+                    { key: "autoFulfillOrders", label: "Auto-fulfill orders", desc: "Mark orders as fulfilled when shipped" },
+                  ] as const).map((item) => (
+                    <div key={item.key} className="flex items-center justify-between py-2.5 border-b border-gray-50">
                       <div>
                         <p className="text-sm font-semibold font-body">{item.label}</p>
                         <p className="text-xs text-gray-500 font-body">{item.desc}</p>
                       </div>
-                      <div className={cn("w-10 h-5 rounded-full cursor-pointer transition-colors", item.enabled ? "bg-green-500" : "bg-gray-300")}>
-                        <div className={cn("w-4 h-4 bg-white rounded-full shadow-sm transition-transform mt-0.5", item.enabled ? "translate-x-5 ml-0.5" : "translate-x-0.5")} />
-                      </div>
+                      <button
+                        onClick={() => {
+                          updateSettings("shopify", { [item.key]: !settings.shopify[item.key] });
+                          setTimeout(() => {
+                            saveSettings({ ...settings, shopify: { ...settings.shopify, [item.key]: !settings.shopify[item.key] } });
+                            showToast(`${item.label} ${!settings.shopify[item.key] ? "enabled" : "disabled"}`);
+                          }, 100);
+                        }}
+                        className={cn("w-10 h-5 rounded-full cursor-pointer transition-colors relative", settings.shopify[item.key] ? "bg-green-500" : "bg-gray-300")}
+                      >
+                        <div className={cn("w-4 h-4 bg-white rounded-full shadow-sm transition-transform absolute top-0.5", settings.shopify[item.key] ? "left-5" : "left-0.5")} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -350,30 +525,56 @@ export default function Settings() {
             <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
               <h3 className="text-sm font-bold font-heading mb-4">Notification Preferences</h3>
               <div className="space-y-3">
-                {[
-                  { label: "New order received", email: true, slack: true },
-                  { label: "Order shipped", email: true, slack: false },
-                  { label: "Return requested", email: true, slack: true },
-                  { label: "SLA breach warning", email: true, slack: true },
-                  { label: "Settlement completed", email: true, slack: false },
-                  { label: "Vendor onboarding complete", email: true, slack: false },
-                  { label: "Low stock alert", email: false, slack: true },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between py-2.5 border-b border-gray-50">
-                    <span className="text-sm font-body">{item.label}</span>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-1.5 text-xs font-body">
-                        <input type="checkbox" defaultChecked={item.email} className="rounded" /> Email
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs font-body">
-                        <input type="checkbox" defaultChecked={item.slack} className="rounded" /> Slack
-                      </label>
+                {([
+                  { key: "newOrder", label: "New order received" },
+                  { key: "orderShipped", label: "Order shipped" },
+                  { key: "returnRequested", label: "Return requested" },
+                  { key: "slaBreach", label: "SLA breach warning" },
+                  { key: "settlementCompleted", label: "Settlement completed" },
+                  { key: "vendorOnboarding", label: "Vendor onboarding complete" },
+                  { key: "lowStock", label: "Low stock alert" },
+                ] as const).map((item) => {
+                  const pref = settings.notifications[item.key] || { email: false, slack: false };
+                  return (
+                    <div key={item.key} className="flex items-center justify-between py-2.5 border-b border-gray-50">
+                      <span className="text-sm font-body">{item.label}</span>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-1.5 text-xs font-body cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={pref.email}
+                            onChange={(e) => {
+                              const updated = { ...settings.notifications, [item.key]: { ...pref, email: e.target.checked } };
+                              updateSettings("notifications", updated);
+                            }}
+                            className="rounded"
+                          />
+                          Email
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs font-body cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={pref.slack}
+                            onChange={(e) => {
+                              const updated = { ...settings.notifications, [item.key]: { ...pref, slack: e.target.checked } };
+                              updateSettings("notifications", updated);
+                            }}
+                            className="rounded"
+                          />
+                          Slack
+                        </label>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              <button className="mt-5 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold font-body hover:bg-gray-800 flex items-center gap-1.5">
-                <Save size={12} /> Save Preferences
+              <button
+                onClick={() => handleSave("Notification")}
+                disabled={saving}
+                className="mt-5 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold font-body hover:bg-gray-800 flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {saving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
+                {saving ? "Saving..." : "Save Preferences"}
               </button>
             </div>
           )}
@@ -391,20 +592,29 @@ export default function Settings() {
               <div className="bg-white rounded-lg border border-gray-200 shadow-soft p-6">
                 <h3 className="text-sm font-bold font-heading mb-4">Security Settings</h3>
                 <div className="space-y-3">
-                  {[
-                    { label: "Two-Factor Authentication", desc: "Require 2FA for all admin accounts", enabled: true },
-                    { label: "Session Timeout", desc: "Auto-logout after 30 minutes of inactivity", enabled: true },
-                    { label: "IP Whitelisting", desc: "Restrict API access to specific IPs", enabled: false },
-                    { label: "Audit Logging", desc: "Log all admin actions for compliance", enabled: true },
-                  ].map((item) => (
-                    <div key={item.label} className="flex items-center justify-between py-2.5 border-b border-gray-50">
+                  {([
+                    { key: "twoFactor", label: "Two-Factor Authentication", desc: "Require 2FA for all admin accounts" },
+                    { key: "sessionTimeout", label: "Session Timeout", desc: "Auto-logout after 30 minutes of inactivity" },
+                    { key: "ipWhitelist", label: "IP Whitelisting", desc: "Restrict API access to specific IPs" },
+                    { key: "auditLogging", label: "Audit Logging", desc: "Log all admin actions for compliance" },
+                  ] as const).map((item) => (
+                    <div key={item.key} className="flex items-center justify-between py-2.5 border-b border-gray-50">
                       <div>
                         <p className="text-sm font-semibold font-body">{item.label}</p>
                         <p className="text-xs text-gray-500 font-body">{item.desc}</p>
                       </div>
-                      <div className={cn("w-10 h-5 rounded-full cursor-pointer transition-colors", item.enabled ? "bg-green-500" : "bg-gray-300")}>
-                        <div className={cn("w-4 h-4 bg-white rounded-full shadow-sm transition-transform mt-0.5", item.enabled ? "translate-x-5 ml-0.5" : "translate-x-0.5")} />
-                      </div>
+                      <button
+                        onClick={() => {
+                          updateSettings("security", { [item.key]: !settings.security[item.key] });
+                          setTimeout(() => {
+                            saveSettings({ ...settings, security: { ...settings.security, [item.key]: !settings.security[item.key] } });
+                            showToast(`${item.label} ${!settings.security[item.key] ? "enabled" : "disabled"}`);
+                          }, 100);
+                        }}
+                        className={cn("w-10 h-5 rounded-full cursor-pointer transition-colors relative", settings.security[item.key] ? "bg-green-500" : "bg-gray-300")}
+                      >
+                        <div className={cn("w-4 h-4 bg-white rounded-full shadow-sm transition-transform absolute top-0.5", settings.security[item.key] ? "left-5" : "left-0.5")} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -430,14 +640,24 @@ export default function Settings() {
                       <p className="text-sm font-semibold font-body">Production API Key</p>
                       <p className="text-xs text-gray-400 font-mono">sk_live_****************************7f3a</p>
                     </div>
-                    <button className="text-xs text-red-500 hover:text-red-700 font-semibold font-body">Regenerate</button>
+                    <button
+                      onClick={() => showToast("API key regeneration coming soon")}
+                      className="text-xs text-red-500 hover:text-red-700 font-semibold font-body"
+                    >
+                      Regenerate
+                    </button>
                   </div>
                   <div className="flex items-center justify-between py-2.5 border-b border-gray-50">
                     <div>
                       <p className="text-sm font-semibold font-body">Webhook Secret</p>
                       <p className="text-xs text-gray-400 font-mono">whsec_****************************9b2e</p>
                     </div>
-                    <button className="text-xs text-red-500 hover:text-red-700 font-semibold font-body">Regenerate</button>
+                    <button
+                      onClick={() => showToast("Webhook secret regeneration coming soon")}
+                      className="text-xs text-red-500 hover:text-red-700 font-semibold font-body"
+                    >
+                      Regenerate
+                    </button>
                   </div>
                 </div>
               </div>

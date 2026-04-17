@@ -56,15 +56,22 @@ export default function Payouts() {
   }, []);
 
   const normalized = useMemo(() =>
-    payouts.map((p) => ({
-      ...p,
-      vendorName: p.vendor?.name || "Unknown",
-      gross: p.grossAmount || 0,
-      commission: p.commissionAmount || 0,
-      deductions: p.deductionAmount || 0,
-      net: p.netAmount || 0,
-      date: p.createdAt || "",
-    })),
+    payouts.map((p) => {
+      // Payout model has a single 'amount' field (the net payout amount)
+      // PayoutItems may provide line-item breakdown
+      const itemsTotal = (p.items || []).reduce((s: number, i: any) => s + (i.amount || 0), 0);
+      const net = p.amount || 0;
+      return {
+        ...p,
+        vendorName: p.vendor?.name || "Unknown",
+        gross: net, // amount IS the net payout
+        commission: 0, // not tracked at payout level
+        deductions: 0, // not tracked at payout level
+        net,
+        date: p.createdAt || "",
+        cycle: p.payoutCycle || "—",
+      };
+    }),
   [payouts]);
 
   const tabFiltered = useMemo(() => {
@@ -121,10 +128,8 @@ export default function Payouts() {
   const columns: ColumnDef<any>[] = [
     { key: "vendorName", label: "Vendor", sortable: true, render: (p) => <span className="text-sm font-semibold font-body">{p.vendorName}</span> },
     { key: "periodStart", label: "Period", sortable: true, render: (p) => <span className="text-xs text-gray-500 font-body">{p.periodStart ? `${formatDate(p.periodStart)} – ${formatDate(p.periodEnd)}` : "—"}</span> },
-    { key: "gross", label: "Gross", sortable: true, align: "right", render: (p) => <span className="text-sm font-body">{formatCurrency(p.gross, p.currency)}</span> },
-    { key: "commission", label: "Commission", sortable: true, align: "right", render: (p) => <span className="text-sm text-red-600 font-body">-{formatCurrency(p.commission, p.currency)}</span> },
-    { key: "deductions", label: "Deductions", sortable: true, align: "right", render: (p) => <span className="text-sm text-red-600 font-body">-{formatCurrency(p.deductions, p.currency)}</span> },
-    { key: "net", label: "Net Amount", sortable: true, align: "right", render: (p) => <span className="text-sm font-bold font-body">{formatCurrency(p.net, p.currency)}</span> },
+    { key: "net", label: "Amount", sortable: true, align: "right", render: (p) => <span className="text-sm font-bold font-body">{formatCurrency(p.net, p.currency)}</span> },
+    { key: "cycle", label: "Cycle", sortable: true, render: (p) => <span className="text-xs font-body">{p.cycle?.replace("_", " ")}</span> },
     { key: "currency", label: "Currency", render: (p) => <span className="text-xs font-body">{p.currency}</span> },
     { key: "status", label: "Status", sortable: true, render: (p) => <span className={`status-badge ${statusColor(p.status)}`}>{p.status}</span> },
     { key: "date", label: "Created", sortable: true, render: (p) => <span className="text-xs text-gray-500 font-body">{formatDate(p.date)}</span> },

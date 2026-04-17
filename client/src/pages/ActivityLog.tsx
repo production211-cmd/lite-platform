@@ -2,13 +2,13 @@
  * ActivityLog — Notifications & Audit Trail
  * ============================================
  * Design: List-first layout with filterable activity feed.
- * Shows operational events: syncs, disputes, payouts, queue actions,
- * vendor changes, order state transitions, and system alerts.
- * Now includes pagination, search, and type/severity filtering.
+ * Shows operational events synthesized from real database records:
+ * orders, shipments, payouts, returns, and product changes.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { Link } from "wouter";
 import {
   Activity, Bell, Search, Clock, CheckCircle,
@@ -60,37 +60,38 @@ const SEVERITY_STYLES: Record<string, string> = {
   success: "border-l-green-400",
 };
 
-// Mock activity data
-const MOCK_ACTIVITIES: ActivityEntry[] = [
-  { id: "a1", timestamp: "2026-04-17T07:45:00Z", type: "sync", severity: "success", title: "Shopify sync completed", description: "Full catalog sync completed. 847 products synced, 3 conflicts resolved automatically.", actor: "System", entityType: "sync", entityId: "sync-42", entityLabel: "Catalog Sync #42" },
-  { id: "a2", timestamp: "2026-04-17T07:30:00Z", type: "order", severity: "info", title: "New order received", description: "Order LT-2026-0089 placed by customer. 3 items, total $2,340.00. Auto-assigned to Julian Fashion.", actor: "System", entityType: "order", entityId: "ord-89", entityLabel: "LT-2026-0089" },
-  { id: "a3", timestamp: "2026-04-17T07:15:00Z", type: "shipment", severity: "warning", title: "Customs hold detected", description: "Shipment FX-9284756103 held at JFK customs. Missing commercial invoice for luxury goods.", actor: "FedEx Tracking", entityType: "shipment", entityId: "shp-42", entityLabel: "FX-9284756103" },
-  { id: "a4", timestamp: "2026-04-17T06:50:00Z", type: "finance", severity: "success", title: "Settlement batch completed", description: "Weekly settlement processed. 12 vendors paid, total £45,230.00. 2 deductions applied.", actor: "Settlement Worker", entityType: "finance", entityId: "stl-18", entityLabel: "Settlement #18" },
-  { id: "a5", timestamp: "2026-04-17T06:30:00Z", type: "vendor", severity: "info", title: "Vendor onboarding progressed", description: "Maison Valentino completed compliance step. 3 of 5 documents uploaded, pending review.", actor: "vendor@valentino.com", entityType: "vendor", entityId: "v-12", entityLabel: "Maison Valentino" },
-  { id: "a6", timestamp: "2026-04-17T06:00:00Z", type: "product", severity: "info", title: "Product approved", description: "Cashmere Double-Breasted Coat by Brunello Cucinelli approved and queued for Shopify push.", actor: "ops@lordandtaylor.com", entityType: "product", entityId: "p-234", entityLabel: "BC-COAT-FW26" },
-  { id: "a7", timestamp: "2026-04-17T05:45:00Z", type: "security", severity: "warning", title: "Failed login attempt", description: "3 failed login attempts from IP 203.0.113.42. Account not locked (threshold: 5).", actor: "Security Monitor" },
-  { id: "a8", timestamp: "2026-04-17T05:30:00Z", type: "sync", severity: "error", title: "Shopify webhook failed", description: "Order webhook delivery failed for order #1089. Retry scheduled in 5 minutes.", actor: "Webhook Handler", entityType: "sync", entityId: "wh-1089", entityLabel: "Webhook #1089" },
-  { id: "a9", timestamp: "2026-04-17T05:00:00Z", type: "order", severity: "info", title: "Order shipped", description: "Order LT-2026-0085 shipped via DHL Express. Tracking: DHL-4829571036. ETA: Apr 20.", actor: "System", entityType: "order", entityId: "ord-85", entityLabel: "LT-2026-0085" },
-  { id: "a10", timestamp: "2026-04-17T04:30:00Z", type: "system", severity: "info", title: "Queue backfill completed", description: "Catalog enrichment queue backfill completed. 23 products re-processed successfully.", actor: "ops@lordandtaylor.com" },
-  { id: "a11", timestamp: "2026-04-16T22:00:00Z", type: "finance", severity: "info", title: "Deduction created", description: "Return deduction of $4,950.00 created for vendor Julian Fashion. Linked to RET-2026-0018.", actor: "System", entityType: "finance", entityId: "ded-45", entityLabel: "Deduction #45" },
-  { id: "a12", timestamp: "2026-04-16T20:00:00Z", type: "vendor", severity: "success", title: "Vendor activated", description: "Gucci Italia S.p.A. onboarding complete. Vendor activated with FULL portal access.", actor: "ops@lordandtaylor.com", entityType: "vendor", entityId: "v-11", entityLabel: "Gucci Italia" },
-];
-
 export default function ActivityLog() {
+  const [activities, setActivities] = useState<ActivityEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
 
+  const loadActivities = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getActivity({ limit: "100" });
+      const list = data?.activities || [];
+      setActivities(list);
+    } catch (err) {
+      console.error("Failed to load activities:", err);
+      setActivities([]);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadActivities(); }, []);
+
   const filteredActivities = useMemo(() => {
-    return MOCK_ACTIVITIES.filter((a) => {
+    return activities.filter((a) => {
       if (search && !a.title.toLowerCase().includes(search.toLowerCase()) && !a.description.toLowerCase().includes(search.toLowerCase())) return false;
       if (typeFilter && a.type !== typeFilter) return false;
       if (severityFilter && a.severity !== severityFilter) return false;
       return true;
     });
-  }, [search, typeFilter, severityFilter]);
+  }, [activities, search, typeFilter, severityFilter]);
 
   const totalPages = Math.ceil(filteredActivities.length / limit);
   const paginated = useMemo(() => {
@@ -103,13 +104,13 @@ export default function ActivityLog() {
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    MOCK_ACTIVITIES.forEach((a) => {
+    activities.forEach((a) => {
       counts[a.type] = (counts[a.type] || 0) + 1;
     });
     return counts;
-  }, []);
+  }, [activities]);
 
-  const unreadCount = MOCK_ACTIVITIES.filter((a) => a.severity === "warning" || a.severity === "error").length;
+  const unreadCount = activities.filter((a) => a.severity === "warning" || a.severity === "error").length;
 
   const formatTime = (ts: string) => {
     const date = new Date(ts);
@@ -134,6 +135,17 @@ export default function ActivityLog() {
     return base ? `${base}${entry.entityId}` : null;
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-gray-500 mt-4 font-body">Loading activity...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-5 page-enter">
       {/* Header */}
@@ -149,7 +161,7 @@ export default function ActivityLog() {
           </div>
           <p className="text-sm text-gray-500 font-body mt-1">Operational events, sync status, and audit trail</p>
         </div>
-        <button className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold font-body hover:bg-gray-50 flex items-center gap-1.5">
+        <button onClick={loadActivities} className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold font-body hover:bg-gray-50 flex items-center gap-1.5">
           <RefreshCw size={12} /> Refresh
         </button>
       </div>
