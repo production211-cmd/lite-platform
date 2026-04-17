@@ -106,7 +106,7 @@ export default function ProductSubmission() {
 
   const [tagInput, setTagInput] = useState("");
 
-  const updateField = (field: keyof ProductForm, value: any) => {
+  const updateField = <K extends keyof ProductForm>(field: K, value: ProductForm[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
   };

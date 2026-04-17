@@ -40,10 +40,19 @@ export default function VendorSettings() {
   const [isDirty, setIsDirty] = useState(false);
   const initialState = useRef<string>("");
 
-  // Simulate fetching API key from server
+  // Fetch API key from server (never hardcode secrets in source)
   useEffect(() => {
-    const timer = setTimeout(() => setApiKey("sk_live_LT_••••••••••••••••••••"), 500);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+    const fetchApiKey = async () => {
+      try {
+        // In production: const res = await api.get('/vendor/api-key');
+        // Simulating server response with masked key
+        await new Promise(r => setTimeout(r, 500));
+        if (!cancelled) setApiKey("[fetched from server]");
+      } catch { if (!cancelled) setApiKey(null); }
+    };
+    fetchApiKey();
+    return () => { cancelled = true; };
   }, []);
 
   const [business, setBusiness] = useState({
@@ -135,13 +144,17 @@ export default function VendorSettings() {
 
       <div className="flex flex-col md:flex-row gap-6">
         {/* Tab Navigation */}
-        <nav className="md:w-56 shrink-0">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-soft overflow-hidden">
+        <nav className="md:w-56 shrink-0" aria-label="Settings sections">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-soft overflow-hidden" role="tablist" aria-orientation="vertical">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
+                  id={`tab-${tab.id}`}
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`tabpanel-${tab.id}`}
                   onClick={() => setActiveTab(tab.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors ${
                     activeTab === tab.id
@@ -158,7 +171,7 @@ export default function VendorSettings() {
         </nav>
 
         {/* Tab Content */}
-        <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-soft p-6">
+        <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-soft p-6" role="tabpanel" id={`tabpanel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
           {/* Business Info */}
           {activeTab === "business" && (
             <div className="space-y-6">
@@ -309,7 +322,7 @@ export default function VendorSettings() {
                 <div className="flex items-center gap-2">
                   <input
                     type={showApiKey ? "text" : "password"}
-                    value={apiKey ? (showApiKey ? apiKey : "sk_live_••••••••••••••••••••") : "Loading..."}
+                    value={apiKey ? (showApiKey ? apiKey : "••••••••••••••••••••") : "Loading..."}
                     readOnly
                     className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-mono bg-white"
                   />
