@@ -3,9 +3,14 @@ import { api } from "@/lib/api";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Link } from "wouter";
 import {
-  Search, Eye, Grid3X3, List, Plus, Package,
-  ChevronLeft, ChevronRight, Image as ImageIcon, Star,
+  Eye, Grid3X3, List, Plus, Package, Image as ImageIcon, Star,
+  Download, Trash2, CheckCircle, Archive,
 } from "lucide-react";
+import {
+  useDataGrid, SearchBar, FilterDropdown, PaginationBar,
+  DataGrid, BulkActionsBar, ActiveFilters, ExportButton,
+  type ColumnDef, type FilterConfig,
+} from "@/components/DataGrid";
 
 const STATUS_TABS = [
   { key: "all", label: "All Products" },
@@ -15,14 +20,48 @@ const STATUS_TABS = [
   { key: "ARCHIVED", label: "Archived" },
 ];
 
+const FILTER_CONFIGS: FilterConfig[] = [
+  {
+    key: "category",
+    label: "Category",
+    type: "multi-select",
+    options: [],
+  },
+  {
+    key: "vendorName",
+    label: "Vendor",
+    type: "multi-select",
+    options: [],
+  },
+  {
+    key: "priceRange",
+    label: "Price Range",
+    type: "select",
+    options: [
+      { value: "0-50", label: "Under $50" },
+      { value: "50-100", label: "$50 – $100" },
+      { value: "100-250", label: "$100 – $250" },
+      { value: "250-500", label: "$250 – $500" },
+      { value: "500+", label: "$500+" },
+    ],
+  },
+  {
+    key: "enrichmentRange",
+    label: "Enrichment",
+    type: "select",
+    options: [
+      { value: "high", label: "High (70%+)" },
+      { value: "medium", label: "Medium (40–69%)" },
+      { value: "low", label: "Low (<40%)" },
+    ],
+  },
+];
+
 export default function Products() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [view, setView] = useState<"grid" | "list">("list");
-  const [page, setPage] = useState(1);
-  const perPage = 20;
 
   useEffect(() => {
     api.getProducts().then((data: any) => {
@@ -32,37 +71,79 @@ export default function Products() {
     }).catch(() => setLoading(false));
   }, []);
 
-  const filtered = useMemo(() => {
-    let result = products;
-    if (activeTab !== "all") result = result.filter((p) => p.status === activeTab);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter((p) =>
-        p.title?.toLowerCase().includes(q) ||
-        p.sku?.toLowerCase().includes(q) ||
-        p.vendor?.name?.toLowerCase().includes(q)
-      );
+  // Normalize products with flattened fields for filtering/sorting
+  const normalized = useMemo(() =>
+    products.map((p) => ({
+      ...p,
+      vendorName: p.vendor?.name || "Unknown",
+      price: p.retailPrice || p.salesPrice || 0,
+      enrichment: p.enrichmentScore || 0,
+    })),
+  [products]);
+
+  // Tab-filtered base
+  const tabFiltered = useMemo(() => {
+    if (activeTab === "all") return normalized;
+    return normalized.filter((p) => p.status === activeTab);
+  }, [normalized, activeTab]);
+
+  // Dynamic filter options from data
+  const dynamicFilterConfigs = useMemo(() => {
+    const categories = [...new Set(normalized.map((p) => p.category).filter(Boolean))];
+    const vendors = [...new Set(normalized.map((p) => p.vendorName).filter(Boolean))];
+    return FILTER_CONFIGS.map((f) => {
+      if (f.key === "category") return { ...f, options: categories.map((c) => ({ value: c, label: c, count: normalized.filter((p) => p.category === c).length })) };
+      if (f.key === "vendorName") return { ...f, options: vendors.map((v) => ({ value: v, label: v, count: normalized.filter((p) => p.vendorName === v).length })) };
+      return f;
+    });
+  }, [normalized]);
+
+  // Custom filter logic for price range and enrichment
+  const applyCustomFilters = (data: any[], filters: Record<string, string | string[]>) => {
+    let result = data;
+    const priceRange = filters.priceRange;
+    if (priceRange && typeof priceRange === "string") {
+      if (priceRange === "500+") result = result.filter((p) => p.price >= 500);
+      else {
+        const [min, max] = priceRange.split("-").map(Number);
+        result = result.filter((p) => p.price >= min && p.price < max);
+      }
+    }
+    const enrichmentRange = filters.enrichmentRange;
+    if (enrichmentRange && typeof enrichmentRange === "string") {
+      if (enrichmentRange === "high") result = result.filter((p) => p.enrichment >= 70);
+      else if (enrichmentRange === "medium") result = result.filter((p) => p.enrichment >= 40 && p.enrichment < 70);
+      else if (enrichmentRange === "low") result = result.filter((p) => p.enrichment < 40);
     }
     return result;
-  }, [products, activeTab, search]);
+  };
 
-  const totalPages = Math.ceil(filtered.length / perPage);
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+  const grid = useDataGrid({
+    data: tabFiltered,
+    searchKeys: ["title", "sku", "vendorSku", "vendorName", "brand"],
+    defaultSort: { key: "title", direction: "asc" },
+    defaultLimit: 25,
+  });
+
+  // Apply custom filters on top of DataGrid's standard filters
+  const customFiltered = useMemo(() =>
+    applyCustomFilters(grid.paginated, grid.filters),
+  [grid.paginated, grid.filters]);
 
   const tabCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: products.length };
+    const counts: Record<string, number> = { all: normalized.length };
     STATUS_TABS.forEach((t) => {
-      if (t.key !== "all") counts[t.key] = products.filter((p) => p.status === t.key).length;
+      if (t.key !== "all") counts[t.key] = normalized.filter((p) => p.status === t.key).length;
     });
     return counts;
-  }, [products]);
+  }, [normalized]);
 
   const stats = useMemo(() => ({
-    total: products.length,
-    active: products.filter((p) => p.status === "ACTIVE").length,
-    pending: products.filter((p) => p.status === "PENDING_REVIEW").length,
-    avgPrice: products.length > 0 ? products.reduce((s, p) => s + (p.retailPrice || p.salesPrice || 0), 0) / products.length : 0,
-  }), [products]);
+    total: normalized.length,
+    active: normalized.filter((p) => p.status === "ACTIVE").length,
+    pending: normalized.filter((p) => p.status === "PENDING_REVIEW").length,
+    avgPrice: normalized.length > 0 ? normalized.reduce((s, p) => s + p.price, 0) / normalized.length : 0,
+  }), [normalized]);
 
   const statusColor = (status: string) => {
     const s = status?.toUpperCase();
@@ -72,6 +153,88 @@ export default function Products() {
     if (s === "ARCHIVED" || s === "REJECTED") return "status-danger";
     return "status-neutral";
   };
+
+  const columns: ColumnDef<any>[] = [
+    {
+      key: "title",
+      label: "Product",
+      sortable: true,
+      render: (p) => (
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-gray-50 overflow-hidden flex-shrink-0 flex items-center justify-center">
+            {p.images?.[0]?.url || p.imageUrl ? (
+              <img src={p.images?.[0]?.url || p.imageUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <ImageIcon size={16} className="text-gray-300" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold font-body truncate max-w-[200px]">{p.title}</p>
+            <p className="text-[10px] text-gray-400 font-body">{p.brand || "—"}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "sku",
+      label: "SKU",
+      sortable: true,
+      render: (p) => <span className="font-mono text-xs">{p.sku || p.vendorSku || "—"}</span>,
+    },
+    {
+      key: "vendorName",
+      label: "Vendor",
+      sortable: true,
+      render: (p) => <span className="text-sm font-body">{p.vendorName}</span>,
+    },
+    {
+      key: "category",
+      label: "Category",
+      sortable: true,
+      render: (p) => (
+        <span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-600">{p.category || "—"}</span>
+      ),
+    },
+    {
+      key: "price",
+      label: "Price",
+      sortable: true,
+      align: "right",
+      render: (p) => <span className="text-sm font-semibold font-body">{formatCurrency(p.price)}</span>,
+    },
+    {
+      key: "enrichment",
+      label: "Enrichment",
+      sortable: true,
+      render: (p) => (
+        <div className="flex items-center gap-1.5">
+          <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className={cn("h-full rounded-full", p.enrichment >= 70 ? "bg-green-500" : p.enrichment >= 40 ? "bg-amber-500" : "bg-red-500")}
+              style={{ width: `${p.enrichment}%` }}
+            />
+          </div>
+          <span className="text-[10px] font-semibold text-gray-600">{p.enrichment}%</span>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      render: (p) => <span className={`status-badge ${statusColor(p.status)}`}>{p.status?.replace(/_/g, " ")}</span>,
+    },
+    {
+      key: "actions",
+      label: "",
+      width: "80px",
+      render: (p) => (
+        <Link href={`/products/${p.id}`} className="btn-view">
+          <Eye size={12} /> View
+        </Link>
+      ),
+    },
+  ];
 
   if (loading) {
     return (
@@ -86,17 +249,22 @@ export default function Products() {
 
   return (
     <div className="p-6 space-y-5 page-enter">
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div className="page-header">
           <h1>Products</h1>
           <p>Manage marketplace product catalog</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 transition-colors font-body">
-          <Plus size={16} />
-          Add Product
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportButton onClick={() => alert("Export feature coming soon")} label="Export CSV" />
+          <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 transition-colors font-body">
+            <Plus size={16} />
+            Add Product
+          </button>
+        </div>
       </div>
 
+      {/* Quick Stats */}
       <div className="grid grid-cols-4 gap-3">
         <div className="quick-stat card-hover animate-fade-in stagger-1">
           <p className="stat-number">{stats.total}</p>
@@ -116,12 +284,25 @@ export default function Products() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="search-bar flex-1">
-          <Search size={16} className="text-gray-400 flex-shrink-0" />
-          <input type="text" placeholder="Search by title, SKU, vendor..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
-        </div>
-        <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+      {/* Search + Filters + View Toggle */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <SearchBar
+          value={grid.search}
+          onChange={grid.setSearch}
+          placeholder="Search by title, SKU, vendor, brand..."
+          className="flex-1 min-w-[280px]"
+        />
+        {dynamicFilterConfigs.map((fc) => (
+          <FilterDropdown
+            key={fc.key}
+            label={fc.label}
+            options={fc.options || []}
+            value={grid.filters[fc.key] || (fc.type === "multi-select" ? [] : "")}
+            onChange={(val) => grid.setFilter(fc.key, val)}
+            multi={fc.type === "multi-select"}
+          />
+        ))}
+        <div className="flex items-center bg-gray-100 rounded-lg p-0.5 ml-auto">
           <button onClick={() => setView("grid")} className={cn("p-2 rounded-md transition-colors", view === "grid" ? "bg-white shadow-sm" : "text-gray-500")}>
             <Grid3X3 size={16} />
           </button>
@@ -131,123 +312,106 @@ export default function Products() {
         </div>
       </div>
 
+      {/* Active Filters Chips */}
+      <ActiveFilters
+        filters={grid.filters}
+        filterConfigs={dynamicFilterConfigs}
+        search={grid.search}
+        onRemoveFilter={(key) => grid.setFilter(key, key === "category" || key === "vendorName" ? [] : "")}
+        onClearSearch={() => grid.setSearch("")}
+        onClearAll={grid.clearFilters}
+      />
+
+      {/* Tab Bar */}
       <div className="tab-bar">
         {STATUS_TABS.map((tab) => (
-          <button key={tab.key} onClick={() => { setActiveTab(tab.key); setPage(1); }} className={`tab-item ${activeTab === tab.key ? "active" : ""}`}>
+          <button
+            key={tab.key}
+            onClick={() => { setActiveTab(tab.key); grid.setSearch(""); }}
+            className={`tab-item ${activeTab === tab.key ? "active" : ""}`}
+          >
             {tab.label} ({tabCounts[tab.key] || 0})
           </button>
         ))}
       </div>
 
-      <div className="text-xs text-gray-500 font-body">
-        Showing {Math.min(((page - 1) * perPage) + 1, filtered.length)}-{Math.min(page * perPage, filtered.length)} of {filtered.length} products
-      </div>
+      {/* Bulk Actions */}
+      <BulkActionsBar
+        selectedCount={grid.selectedRows.size}
+        totalCount={grid.paginated.length}
+        onSelectAll={grid.toggleAllRows}
+        onDeselectAll={() => grid.toggleAllRows()}
+        actions={[
+          { label: "Approve", icon: CheckCircle, onClick: () => alert("Approve feature coming soon") },
+          { label: "Archive", icon: Archive, onClick: () => alert("Archive feature coming soon") },
+          { label: "Delete", icon: Trash2, onClick: () => alert("Delete feature coming soon"), variant: "danger" },
+        ]}
+      />
 
+      {/* Data Grid or Card Grid */}
       {view === "grid" ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {paginated.map((product) => (
-            <div key={product.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden card-hover cursor-pointer">
-              <div className="aspect-square bg-gray-50 relative overflow-hidden flex items-center justify-center">
-                {product.images?.[0]?.url || product.imageUrl ? (
-                  <img src={product.images?.[0]?.url || product.imageUrl} alt={product.title} className="w-full h-full object-cover" />
-                ) : (
-                  <ImageIcon size={32} className="text-gray-300" />
-                )}
-                {product.enrichmentScore != null && (
-                  <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5 flex items-center gap-1">
-                    <Star size={10} className="text-amber-500" />
-                    <span className="text-[10px] font-bold">{product.enrichmentScore}</span>
-                  </div>
-                )}
-              </div>
-              <div className="p-3">
-                <p className="text-[10px] text-gray-500 font-body mb-0.5">{product.vendor?.name}</p>
-                <h3 className="text-sm font-semibold font-body truncate">{product.title}</h3>
-                <div className="flex items-center justify-between mt-2">
-                  <p className="text-sm font-bold font-body">{formatCurrency(product.retailPrice || product.salesPrice || 0)}</p>
-                  <span className={`status-badge ${statusColor(product.status)}`}>{product.status?.replace(/_/g, " ")}</span>
+          {grid.paginated.map((product) => (
+            <Link key={product.id} href={`/products/${product.id}`}>
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden card-hover cursor-pointer">
+                <div className="aspect-square bg-gray-50 relative overflow-hidden flex items-center justify-center">
+                  {product.images?.[0]?.url || product.imageUrl ? (
+                    <img src={product.images?.[0]?.url || product.imageUrl} alt={product.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageIcon size={32} className="text-gray-300" />
+                  )}
+                  {product.enrichment != null && (
+                    <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5 flex items-center gap-1">
+                      <Star size={10} className="text-amber-500" />
+                      <span className="text-[10px] font-bold">{product.enrichment}%</span>
+                    </div>
+                  )}
                 </div>
-                <p className="text-[10px] text-gray-400 font-mono mt-1">SKU: {product.sku || product.vendorSku || "—"}</p>
+                <div className="p-3">
+                  <p className="text-[10px] text-gray-500 font-body mb-0.5">{product.vendorName}</p>
+                  <h3 className="text-sm font-semibold font-body truncate">{product.title}</h3>
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-sm font-bold font-body">{formatCurrency(product.price)}</p>
+                    <span className={`status-badge ${statusColor(product.status)}`}>{product.status?.replace(/_/g, " ")}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-mono mt-1">SKU: {product.sku || product.vendorSku || "—"}</p>
+                </div>
               </div>
-            </div>
+            </Link>
           ))}
+          {grid.paginated.length === 0 && (
+            <div className="col-span-full text-center py-12 text-gray-400 font-body">
+              <Package size={40} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-sm font-medium text-slate-600">No products found</p>
+              <p className="text-xs text-slate-400 mt-1">Try adjusting your search or filters</p>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-soft">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>SKU</th>
-                <th>Vendor</th>
-                <th>Category</th>
-                <th>Price</th>
-                <th>Enrichment</th>
-                <th>Status</th>
-                <th className="w-20"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map((product) => (
-                <tr key={product.id}>
-                  <td>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gray-50 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        {product.images?.[0]?.url || product.imageUrl ? (
-                          <img src={product.images?.[0]?.url || product.imageUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <ImageIcon size={16} className="text-gray-300" />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold font-body truncate max-w-[200px]">{product.title}</p>
-                        <p className="text-[10px] text-gray-400 font-body">{product.brand || "—"}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="font-mono text-xs font-body">{product.sku || product.vendorSku || "—"}</td>
-                  <td className="text-sm font-body">{product.vendor?.name || "—"}</td>
-                  <td className="text-xs font-body"><span className="px-2 py-0.5 bg-gray-100 rounded-full text-gray-600">{product.category || "—"}</span></td>
-                  <td className="text-sm font-semibold font-body">{formatCurrency(product.retailPrice || product.salesPrice || 0)}</td>
-                  <td>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className={cn("h-full rounded-full", (product.enrichmentScore || 0) >= 70 ? "bg-green-500" : (product.enrichmentScore || 0) >= 40 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${product.enrichmentScore || 0}%` }} />
-                      </div>
-                      <span className="text-[10px] font-semibold text-gray-600">{product.enrichmentScore || 0}%</span>
-                    </div>
-                  </td>
-                  <td><span className={`status-badge ${statusColor(product.status)}`}>{product.status?.replace(/_/g, " ")}</span></td>
-                  <td><Link href={`/products/${product.id}`} className="btn-view"><Eye size={12} /> View</Link></td>
-                </tr>
-              ))}
-              {paginated.length === 0 && (
-                <tr><td colSpan={8} className="text-center py-12 text-gray-400 font-body">No products found</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataGrid
+          columns={columns}
+          data={grid.paginated}
+          sort={grid.sort}
+          onSort={grid.toggleSort}
+          selectable
+          selectedRows={grid.selectedRows}
+          onToggleRow={grid.toggleRow}
+          onToggleAll={grid.toggleAllRows}
+          allSelected={grid.allSelected}
+          emptyMessage="No products found"
+          emptyIcon={Package}
+        />
       )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30">
-            <ChevronLeft size={16} />
-          </button>
-          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-            const p = page <= 3 ? i + 1 : page - 2 + i;
-            if (p > totalPages || p < 1) return null;
-            return (
-              <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded-lg text-xs font-semibold font-body transition-colors ${p === page ? "bg-gray-900 text-white" : "border border-gray-200 hover:bg-gray-50"}`}>
-                {p}
-              </button>
-            );
-          })}
-          <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      )}
+      {/* Pagination */}
+      <PaginationBar
+        page={grid.page}
+        totalPages={grid.totalPages}
+        totalItems={grid.totalFiltered}
+        limit={grid.limit}
+        onPageChange={grid.setPage}
+        onLimitChange={grid.setLimit}
+      />
     </div>
   );
 }

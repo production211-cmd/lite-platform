@@ -1,11 +1,15 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link } from "wouter";
 import { api } from "@/lib/api";
-import { formatCurrency, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
-  Store, Search, Grid3X3, List, MapPin, Globe, Eye,
-  Package, ShoppingCart, Plus, ChevronLeft, ChevronRight,
+  Store, Grid3X3, List, MapPin, Eye, Plus,
 } from "lucide-react";
+import {
+  useDataGrid, SearchBar, FilterDropdown, PaginationBar,
+  DataGrid, ActiveFilters, ExportButton,
+  type ColumnDef, type FilterConfig,
+} from "@/components/DataGrid";
 
 const TABS = [
   { key: "all", label: "All Vendors" },
@@ -15,14 +19,40 @@ const TABS = [
   { key: "inactive", label: "Inactive" },
 ];
 
+const FILTER_CONFIGS: FilterConfig[] = [
+  {
+    key: "location",
+    label: "Location",
+    type: "select",
+    options: [
+      { value: "DOMESTIC_US", label: "Domestic (US)" },
+      { value: "INTERNATIONAL", label: "International" },
+    ],
+  },
+  {
+    key: "integrationType",
+    label: "Integration",
+    type: "multi-select",
+    options: [],
+  },
+  {
+    key: "commissionRange",
+    label: "Commission",
+    type: "select",
+    options: [
+      { value: "0-10", label: "0–10%" },
+      { value: "10-20", label: "10–20%" },
+      { value: "20-30", label: "20–30%" },
+      { value: "30+", label: "30%+" },
+    ],
+  },
+];
+
 export default function Vendors() {
   const [vendors, setVendors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [page, setPage] = useState(1);
-  const perPage = 20;
 
   useEffect(() => {
     api.getVendors().then((data: any) => {
@@ -32,36 +62,145 @@ export default function Vendors() {
     }).catch(() => setLoading(false));
   }, []);
 
-  const filtered = useMemo(() => {
-    let result = vendors;
-    if (activeTab === "MARKETPLACE" || activeTab === "WHOLESALE") {
-      result = result.filter((v) => v.economicModel === activeTab);
-    } else if (activeTab === "active") {
-      result = result.filter((v) => v.isActive);
-    } else if (activeTab === "inactive") {
-      result = result.filter((v) => !v.isActive);
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter((v) =>
-        v.name?.toLowerCase().includes(q) ||
-        v.slug?.toLowerCase().includes(q) ||
-        v.city?.toLowerCase().includes(q)
-      );
-    }
-    return result;
-  }, [vendors, activeTab, search]);
+  // Normalize
+  const normalized = useMemo(() =>
+    vendors.map((v) => ({
+      ...v,
+      productCount: v._count?.products || 0,
+      orderCount: v._count?.vendorOrders || 0,
+      commission: v.commissionRate || 0,
+    })),
+  [vendors]);
 
-  const totalPages = Math.ceil(filtered.length / perPage);
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+  // Tab filter
+  const tabFiltered = useMemo(() => {
+    if (activeTab === "all") return normalized;
+    if (activeTab === "MARKETPLACE" || activeTab === "WHOLESALE") return normalized.filter((v) => v.economicModel === activeTab);
+    if (activeTab === "active") return normalized.filter((v) => v.isActive);
+    if (activeTab === "inactive") return normalized.filter((v) => !v.isActive);
+    return normalized;
+  }, [normalized, activeTab]);
+
+  // Dynamic filter options
+  const dynamicFilterConfigs = useMemo(() => {
+    const integrations = [...new Set(normalized.map((v) => v.integrationType).filter(Boolean))];
+    return FILTER_CONFIGS.map((f) => {
+      if (f.key === "integrationType") return { ...f, options: integrations.map((i) => ({ value: i, label: i, count: normalized.filter((v) => v.integrationType === i).length })) };
+      return f;
+    });
+  }, [normalized]);
+
+  const grid = useDataGrid({
+    data: tabFiltered,
+    searchKeys: ["name", "slug", "city", "country"],
+    defaultSort: { key: "name", direction: "asc" },
+    defaultLimit: 20,
+  });
 
   const tabCounts = useMemo(() => ({
-    all: vendors.length,
-    MARKETPLACE: vendors.filter((v) => v.economicModel === "MARKETPLACE").length,
-    WHOLESALE: vendors.filter((v) => v.economicModel === "WHOLESALE").length,
-    active: vendors.filter((v) => v.isActive).length,
-    inactive: vendors.filter((v) => !v.isActive).length,
-  }), [vendors]);
+    all: normalized.length,
+    MARKETPLACE: normalized.filter((v) => v.economicModel === "MARKETPLACE").length,
+    WHOLESALE: normalized.filter((v) => v.economicModel === "WHOLESALE").length,
+    active: normalized.filter((v) => v.isActive).length,
+    inactive: normalized.filter((v) => !v.isActive).length,
+  }), [normalized]);
+
+  const columns: ColumnDef<any>[] = [
+    {
+      key: "name",
+      label: "Vendor",
+      sortable: true,
+      render: (v) => (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
+            {v.logoUrl ? (
+              <img src={v.logoUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs font-bold text-gray-400">{v.name?.[0]}</span>
+            )}
+          </div>
+          <div>
+            <p className="font-semibold text-sm font-body">{v.name}</p>
+            <p className="text-[10px] text-gray-500 font-body">{v.slug}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "city",
+      label: "Location",
+      sortable: true,
+      render: (v) => (
+        <div className="flex items-center gap-1">
+          <MapPin size={12} className="text-gray-400" />
+          <span className="text-xs font-body">{v.city || v.country || "—"}</span>
+        </div>
+      ),
+    },
+    {
+      key: "economicModel",
+      label: "Model",
+      sortable: true,
+      render: (v) => (
+        <span className={cn(
+          "text-[10px] px-2 py-0.5 rounded-full font-semibold font-body",
+          v.economicModel === "MARKETPLACE" ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"
+        )}>
+          {v.economicModel}
+        </span>
+      ),
+    },
+    {
+      key: "integrationType",
+      label: "Integration",
+      sortable: true,
+      render: (v) => <span className="text-xs font-body">{v.integrationType || "—"}</span>,
+    },
+    {
+      key: "commission",
+      label: "Commission",
+      sortable: true,
+      align: "right",
+      render: (v) => <span className="text-xs font-body">{v.commission ? `${v.commission}%` : "—"}</span>,
+    },
+    {
+      key: "productCount",
+      label: "Products",
+      sortable: true,
+      align: "right",
+      render: (v) => <span className="text-xs font-semibold font-body">{v.productCount}</span>,
+    },
+    {
+      key: "orderCount",
+      label: "Orders",
+      sortable: true,
+      align: "right",
+      render: (v) => <span className="text-xs font-semibold font-body">{v.orderCount}</span>,
+    },
+    {
+      key: "isActive",
+      label: "Status",
+      sortable: true,
+      render: (v) => (
+        <span className={cn(
+          "text-[10px] font-semibold px-2 py-0.5 rounded-full font-body",
+          v.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+        )}>
+          {v.isActive ? "Active" : "Inactive"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      width: "80px",
+      render: (v) => (
+        <Link href={`/vendors/${v.id}`}>
+          <button className="btn-view"><Eye size={12} /> View</button>
+        </Link>
+      ),
+    },
+  ];
 
   if (loading) {
     return (
@@ -76,30 +215,33 @@ export default function Vendors() {
 
   return (
     <div className="p-6 space-y-5 page-enter">
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div className="page-header">
           <h1>Vendors</h1>
           <p>Manage marketplace vendor partnerships</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 transition-colors font-body">
-          <Plus size={16} />
-          Add Vendor
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportButton onClick={() => alert("Export feature coming soon")} label="Export" />
+          <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 transition-colors font-body">
+            <Plus size={16} />
+            Add Vendor
+          </button>
+        </div>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-4 gap-3">
         <div className="quick-stat card-hover">
-          <p className="stat-number">{vendors.length}</p>
+          <p className="stat-number">{normalized.length}</p>
           <p className="stat-label">Total Vendors</p>
         </div>
         <div className="quick-stat card-hover">
-          <p className="stat-number">{vendors.filter((v) => v.location === "DOMESTIC_US").length}</p>
+          <p className="stat-number">{normalized.filter((v) => v.location === "DOMESTIC_US").length}</p>
           <p className="stat-label">Domestic (US)</p>
         </div>
         <div className="quick-stat card-hover">
-          <p className="stat-number">{vendors.filter((v) => v.location === "INTERNATIONAL").length}</p>
+          <p className="stat-number">{normalized.filter((v) => v.location === "INTERNATIONAL").length}</p>
           <p className="stat-label">International</p>
         </div>
         <div className="quick-stat card-hover">
@@ -109,38 +251,49 @@ export default function Vendors() {
       </div>
 
       {/* Search + Filters + View Toggle */}
-      <div className="flex items-center gap-3">
-        <div className="search-bar flex-1">
-          <Search size={16} className="text-gray-400 flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search vendors by name, city..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+      <div className="flex items-center gap-3 flex-wrap">
+        <SearchBar
+          value={grid.search}
+          onChange={grid.setSearch}
+          placeholder="Search vendors by name, city, country..."
+          className="flex-1 min-w-[280px]"
+        />
+        {dynamicFilterConfigs.map((fc) => (
+          <FilterDropdown
+            key={fc.key}
+            label={fc.label}
+            options={fc.options || []}
+            value={grid.filters[fc.key] || (fc.type === "multi-select" ? [] : "")}
+            onChange={(val) => grid.setFilter(fc.key, val)}
+            multi={fc.type === "multi-select"}
           />
-        </div>
-        <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-          <button
-            onClick={() => setView("grid")}
-            className={cn("p-2 rounded-md transition-colors", view === "grid" ? "bg-white shadow-sm" : "text-gray-500")}
-          >
+        ))}
+        <div className="flex items-center bg-gray-100 rounded-lg p-0.5 ml-auto">
+          <button onClick={() => setView("grid")} className={cn("p-2 rounded-md transition-colors", view === "grid" ? "bg-white shadow-sm" : "text-gray-500")}>
             <Grid3X3 size={16} />
           </button>
-          <button
-            onClick={() => setView("list")}
-            className={cn("p-2 rounded-md transition-colors", view === "list" ? "bg-white shadow-sm" : "text-gray-500")}
-          >
+          <button onClick={() => setView("list")} className={cn("p-2 rounded-md transition-colors", view === "list" ? "bg-white shadow-sm" : "text-gray-500")}>
             <List size={16} />
           </button>
         </div>
       </div>
+
+      {/* Active Filters */}
+      <ActiveFilters
+        filters={grid.filters}
+        filterConfigs={dynamicFilterConfigs}
+        search={grid.search}
+        onRemoveFilter={(key) => grid.setFilter(key, key === "integrationType" ? [] : "")}
+        onClearSearch={() => grid.setSearch("")}
+        onClearAll={grid.clearFilters}
+      />
 
       {/* Tab Bar */}
       <div className="tab-bar">
         {TABS.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => { setActiveTab(tab.key); setPage(1); }}
+            onClick={() => { setActiveTab(tab.key); grid.setSearch(""); }}
             className={`tab-item ${activeTab === tab.key ? "active" : ""}`}
           >
             {tab.label} ({tabCounts[tab.key as keyof typeof tabCounts] || 0})
@@ -148,17 +301,12 @@ export default function Vendors() {
         ))}
       </div>
 
-      {/* Results count */}
-      <div className="text-xs text-gray-500 font-body">
-        Showing {Math.min(((page - 1) * perPage) + 1, filtered.length)}-{Math.min(page * perPage, filtered.length)} of {filtered.length} vendors
-      </div>
-
-      {/* Vendor Grid */}
+      {/* Grid or Table */}
       {view === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {paginated.map((vendor) => (
+          {grid.paginated.map((vendor) => (
             <Link key={vendor.id} href={`/vendors/${vendor.id}`}>
-              <div className="bg-white rounded-lg border border-gray-200 p-5 card-hover cursor-pointer">
+              <div className="bg-white rounded-lg border border-gray-200 p-5 card-hover cursor-pointer shadow-soft">
                 <div className="flex items-start gap-3 mb-4">
                   <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
                     {vendor.logoUrl ? (
@@ -183,18 +331,16 @@ export default function Vendors() {
                     {vendor.isActive ? "Active" : "Inactive"}
                   </span>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-                    <p className="text-lg font-bold font-body">{vendor._count?.products || 0}</p>
+                    <p className="text-lg font-bold font-body">{vendor.productCount}</p>
                     <p className="text-[10px] text-gray-500 font-body">Products</p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-                    <p className="text-lg font-bold font-body">{vendor._count?.vendorOrders || 0}</p>
+                    <p className="text-lg font-bold font-body">{vendor.orderCount}</p>
                     <p className="text-[10px] text-gray-500 font-body">Orders</p>
                   </div>
                 </div>
-
                 <div className="flex items-center justify-between text-[11px]">
                   <span className={cn(
                     "px-2 py-0.5 rounded-full font-semibold font-body",
@@ -203,122 +349,40 @@ export default function Vendors() {
                     {vendor.economicModel}
                   </span>
                   <span className="text-gray-500 font-body">
-                    {vendor.commissionRate ? `${vendor.commissionRate}% comm.` : "Wholesale"}
+                    {vendor.commission ? `${vendor.commission}% comm.` : "Wholesale"}
                   </span>
                 </div>
               </div>
             </Link>
           ))}
+          {grid.paginated.length === 0 && (
+            <div className="col-span-full text-center py-12 text-gray-400 font-body">
+              <Store size={40} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-sm font-medium text-slate-600">No vendors found</p>
+              <p className="text-xs text-slate-400 mt-1">Try adjusting your search or filters</p>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-soft">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Vendor</th>
-                <th>Location</th>
-                <th>Model</th>
-                <th>Integration</th>
-                <th>Commission</th>
-                <th>Products</th>
-                <th>Orders</th>
-                <th>Status</th>
-                <th className="w-20"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map((vendor) => (
-                <tr key={vendor.id}>
-                  <td>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        {vendor.logoUrl ? (
-                          <img src={vendor.logoUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-xs font-bold text-gray-400">{vendor.name?.[0]}</span>
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-sm font-body">{vendor.name}</p>
-                        <p className="text-[10px] text-gray-500 font-body">{vendor.slug}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex items-center gap-1">
-                      <MapPin size={12} className="text-gray-400" />
-                      <span className="text-xs font-body">{vendor.city || vendor.country || "—"}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={cn(
-                      "text-[10px] px-2 py-0.5 rounded-full font-semibold font-body",
-                      vendor.economicModel === "MARKETPLACE" ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"
-                    )}>
-                      {vendor.economicModel}
-                    </span>
-                  </td>
-                  <td className="text-xs font-body">{vendor.integrationType}</td>
-                  <td className="text-xs font-body">{vendor.commissionRate ? `${vendor.commissionRate}%` : "—"}</td>
-                  <td className="text-xs font-semibold font-body">{vendor._count?.products || 0}</td>
-                  <td className="text-xs font-semibold font-body">{vendor._count?.vendorOrders || 0}</td>
-                  <td>
-                    <span className={cn(
-                      "text-[10px] font-semibold px-2 py-0.5 rounded-full font-body",
-                      vendor.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-                    )}>
-                      {vendor.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td>
-                    <Link href={`/vendors/${vendor.id}`}>
-                      <button className="btn-view">
-                        <Eye size={12} />
-                        View
-                      </button>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataGrid
+          columns={columns}
+          data={grid.paginated}
+          sort={grid.sort}
+          onSort={grid.toggleSort}
+          emptyMessage="No vendors found"
+          emptyIcon={Store}
+        />
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPage(Math.max(1, page - 1))}
-            disabled={page === 1}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-            const p = page <= 3 ? i + 1 : page - 2 + i;
-            if (p > totalPages || p < 1) return null;
-            return (
-              <button
-                key={p}
-                onClick={() => setPage(p)}
-                className={`w-8 h-8 rounded-lg text-xs font-semibold font-body transition-colors ${
-                  p === page ? "bg-gray-900 text-white" : "border border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {p}
-              </button>
-            );
-          })}
-          <button
-            onClick={() => setPage(Math.min(totalPages, page + 1))}
-            disabled={page === totalPages}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      )}
+      <PaginationBar
+        page={grid.page}
+        totalPages={grid.totalPages}
+        totalItems={grid.totalFiltered}
+        limit={grid.limit}
+        onPageChange={grid.setPage}
+        onLimitChange={grid.setLimit}
+      />
     </div>
   );
 }

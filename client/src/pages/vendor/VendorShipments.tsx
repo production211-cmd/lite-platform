@@ -19,7 +19,7 @@ export default function VendorShipments() {
     async function load() {
       setLoading(true);
       try {
-        const params: Record<string, string> = { page: String(page), limit: "20", vendorId };
+        const params: Record<string, string> = { page: String(page), limit: "20", vendorId: vendorId! };
         if (statusFilter) params.status = statusFilter;
         const data = await api.getShipments(params);
         setShipments(data.shipments || []);

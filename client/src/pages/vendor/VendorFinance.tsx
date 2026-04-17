@@ -20,7 +20,7 @@ export default function VendorFinance() {
     async function load() {
       setLoading(true);
       try {
-        const params: Record<string, string> = { page: String(page), limit: "20", vendorId };
+        const params: Record<string, string> = { page: String(page), limit: "20", vendorId: vendorId! };
         if (tab === "payouts") {
           const data = await api.getPayouts(params);
           setPayouts(data.payouts || []);

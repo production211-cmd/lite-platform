@@ -4,18 +4,19 @@
  * Design: List-first layout with filterable activity feed.
  * Shows operational events: syncs, disputes, payouts, queue actions,
  * vendor changes, order state transitions, and system alerts.
- * Serves as the visible audit/activity surface Perplexity required.
+ * Now includes pagination, search, and type/severity filtering.
  */
 
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import {
-  Activity, Bell, Filter, Search, Clock, CheckCircle,
-  AlertTriangle, XCircle, RefreshCw, ShoppingBag, Truck,
+  Activity, Bell, Search, Clock, CheckCircle,
+  AlertTriangle, RefreshCw, ShoppingBag, Truck,
   CreditCard, Users, Database, Package, Shield, ArrowRight,
-  ChevronRight, Eye, Settings,
+  Settings,
 } from "lucide-react";
+import { PaginationBar } from "@/components/DataGrid";
 
 interface ActivityEntry {
   id: string;
@@ -79,6 +80,8 @@ export default function ActivityLog() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
   const filteredActivities = useMemo(() => {
     return MOCK_ACTIVITIES.filter((a) => {
@@ -88,6 +91,15 @@ export default function ActivityLog() {
       return true;
     });
   }, [search, typeFilter, severityFilter]);
+
+  const totalPages = Math.ceil(filteredActivities.length / limit);
+  const paginated = useMemo(() => {
+    const start = (page - 1) * limit;
+    return filteredActivities.slice(start, start + limit);
+  }, [filteredActivities, page, limit]);
+
+  // Reset page when filters change
+  useMemo(() => { setPage(1); }, [search, typeFilter, severityFilter]);
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -143,9 +155,9 @@ export default function ActivityLog() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         {/* Search */}
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1 min-w-[250px] max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -157,7 +169,7 @@ export default function ActivityLog() {
         </div>
 
         {/* Type Filter Chips */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap">
           <button
             onClick={() => setTypeFilter(null)}
             className={cn(
@@ -211,10 +223,15 @@ export default function ActivityLog() {
         </div>
       </div>
 
+      {/* Results count */}
+      <div className="text-xs text-gray-500 font-body">
+        Showing {paginated.length} of {filteredActivities.length} events
+      </div>
+
       {/* Activity Feed */}
       <div className="space-y-2">
-        {filteredActivities.length > 0 ? (
-          filteredActivities.map((entry) => {
+        {paginated.length > 0 ? (
+          paginated.map((entry) => {
             const Icon = TYPE_ICONS[entry.type] || Activity;
             const link = getEntityLink(entry);
             return (
@@ -269,6 +286,16 @@ export default function ActivityLog() {
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        totalItems={filteredActivities.length}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }}
+      />
     </div>
   );
 }
