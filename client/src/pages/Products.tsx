@@ -62,6 +62,8 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
   const [view, setView] = useState<"grid" | "list">("list");
+  const [priceRange, setPriceRange] = useState("");
+  const [enrichmentRange, setEnrichmentRange] = useState("");
 
   useEffect(() => {
     api.getProducts().then((data: any) => {
@@ -98,37 +100,30 @@ export default function Products() {
     });
   }, [normalized]);
 
-  // Custom filter logic for price range and enrichment
-  const applyCustomFilters = (data: any[], filters: Record<string, string | string[]>) => {
-    let result = data;
-    const priceRange = filters.priceRange;
-    if (priceRange && typeof priceRange === "string") {
-      if (priceRange === "500+") result = result.filter((p) => p.price >= 500);
+  // Custom filter logic for price range and enrichment — applied BEFORE useDataGrid (no circular dep)
+  const customFiltered = useMemo(() => {
+    let result = tabFiltered;
+    if (priceRange) {
+      if (priceRange === "500+") result = result.filter((p: any) => p.price >= 500);
       else {
         const [min, max] = priceRange.split("-").map(Number);
-        result = result.filter((p) => p.price >= min && p.price < max);
+        result = result.filter((p: any) => p.price >= min && p.price < max);
       }
     }
-    const enrichmentRange = filters.enrichmentRange;
-    if (enrichmentRange && typeof enrichmentRange === "string") {
-      if (enrichmentRange === "high") result = result.filter((p) => p.enrichment >= 70);
-      else if (enrichmentRange === "medium") result = result.filter((p) => p.enrichment >= 40 && p.enrichment < 70);
-      else if (enrichmentRange === "low") result = result.filter((p) => p.enrichment < 40);
+    if (enrichmentRange) {
+      if (enrichmentRange === "high") result = result.filter((p: any) => p.enrichment >= 70);
+      else if (enrichmentRange === "medium") result = result.filter((p: any) => p.enrichment >= 40 && p.enrichment < 70);
+      else if (enrichmentRange === "low") result = result.filter((p: any) => p.enrichment < 40);
     }
     return result;
-  };
+  }, [tabFiltered, priceRange, enrichmentRange]);
 
   const grid = useDataGrid({
-    data: tabFiltered,
+    data: customFiltered,
     searchKeys: ["title", "sku", "vendorSku", "vendorName", "brand"],
     defaultSort: { key: "title", direction: "asc" },
     defaultLimit: 25,
   });
-
-  // Apply custom filters on top of DataGrid's standard filters
-  const customFiltered = useMemo(() =>
-    applyCustomFilters(grid.paginated, grid.filters),
-  [grid.paginated, grid.filters]);
 
   const tabCounts = useMemo(() => {
     const counts: Record<string, number> = { all: normalized.length };
@@ -265,7 +260,7 @@ export default function Products() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="quick-stat card-hover animate-fade-in stagger-1">
           <p className="stat-number">{stats.total}</p>
           <p className="stat-label">Total Products</p>
@@ -292,21 +287,46 @@ export default function Products() {
           placeholder="Search by title, SKU, vendor, brand..."
           className="flex-1 min-w-[280px]"
         />
-        {dynamicFilterConfigs.map((fc) => (
-          <FilterDropdown
-            key={fc.key}
-            label={fc.label}
-            options={fc.options || []}
-            value={grid.filters[fc.key] || (fc.type === "multi-select" ? [] : "")}
-            onChange={(val) => grid.setFilter(fc.key, val)}
-            multi={fc.type === "multi-select"}
-          />
-        ))}
+        {dynamicFilterConfigs.map((fc) => {
+          // priceRange and enrichmentRange use local state (pre-grid filtering)
+          if (fc.key === "priceRange") {
+            return (
+              <FilterDropdown
+                key={fc.key}
+                label={fc.label}
+                options={fc.options || []}
+                value={priceRange}
+                onChange={(val) => setPriceRange(typeof val === "string" ? val : "")}
+              />
+            );
+          }
+          if (fc.key === "enrichmentRange") {
+            return (
+              <FilterDropdown
+                key={fc.key}
+                label={fc.label}
+                options={fc.options || []}
+                value={enrichmentRange}
+                onChange={(val) => setEnrichmentRange(typeof val === "string" ? val : "")}
+              />
+            );
+          }
+          return (
+            <FilterDropdown
+              key={fc.key}
+              label={fc.label}
+              options={fc.options || []}
+              value={grid.filters[fc.key] || (fc.type === "multi-select" ? [] : "")}
+              onChange={(val) => grid.setFilter(fc.key, val)}
+              multi={fc.type === "multi-select"}
+            />
+          );
+        })}
         <div className="flex items-center bg-gray-100 rounded-lg p-0.5 ml-auto">
-          <button onClick={() => setView("grid")} className={cn("p-2 rounded-md transition-colors", view === "grid" ? "bg-white shadow-sm" : "text-gray-500")}>
+          <button onClick={() => setView("grid")} aria-label="Grid view" aria-pressed={view === "grid"} className={cn("p-2 rounded-md transition-colors", view === "grid" ? "bg-white shadow-sm" : "text-gray-500")}>
             <Grid3X3 size={16} />
           </button>
-          <button onClick={() => setView("list")} className={cn("p-2 rounded-md transition-colors", view === "list" ? "bg-white shadow-sm" : "text-gray-500")}>
+          <button onClick={() => setView("list")} aria-label="List view" aria-pressed={view === "list"} className={cn("p-2 rounded-md transition-colors", view === "list" ? "bg-white shadow-sm" : "text-gray-500")}>
             <List size={16} />
           </button>
         </div>
@@ -314,12 +334,20 @@ export default function Products() {
 
       {/* Active Filters Chips */}
       <ActiveFilters
-        filters={grid.filters}
+        filters={{
+          ...grid.filters,
+          ...(priceRange ? { priceRange } : {}),
+          ...(enrichmentRange ? { enrichmentRange } : {}),
+        }}
         filterConfigs={dynamicFilterConfigs}
         search={grid.search}
-        onRemoveFilter={(key) => grid.setFilter(key, key === "category" || key === "vendorName" ? [] : "")}
+        onRemoveFilter={(key) => {
+          if (key === "priceRange") { setPriceRange(""); return; }
+          if (key === "enrichmentRange") { setEnrichmentRange(""); return; }
+          grid.setFilter(key, key === "category" || key === "vendorName" ? [] : "");
+        }}
         onClearSearch={() => grid.setSearch("")}
-        onClearAll={grid.clearFilters}
+        onClearAll={() => { grid.clearFilters(); setActiveTab("all"); setPriceRange(""); setEnrichmentRange(""); }}
       />
 
       {/* Tab Bar */}

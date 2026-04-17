@@ -25,7 +25,7 @@ export interface FilterOption {
 export interface FilterConfig {
   key: string;
   label: string;
-  type: "select" | "multi-select" | "date-range" | "range";
+  type: "select" | "multi-select" | "date-range";
   options?: FilterOption[];
   min?: number;
   max?: number;
@@ -266,6 +266,7 @@ export function FilterDropdown({
           "filter-select",
           hasValue && "border-[var(--brand-blue)] text-[var(--brand-blue)] font-semibold"
         )}
+        aria-label={label}
       >
         <option value="">{label}</option>
         {options.map((opt) => (
@@ -281,6 +282,8 @@ export function FilterDropdown({
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
         className={cn(
           "filter-select flex items-center gap-1.5",
           hasValue && "border-[var(--brand-blue)] text-[var(--brand-blue)] font-semibold"
@@ -297,12 +300,14 @@ export function FilterDropdown({
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 bg-white border border-[var(--border)] rounded-lg shadow-elevated z-40 min-w-[200px] py-1 animate-scale-in">
+          <div role="listbox" aria-multiselectable="true" aria-label={`${label} options`} className="absolute top-full left-0 mt-1 bg-white border border-[var(--border)] rounded-lg shadow-elevated z-40 min-w-[200px] py-1 animate-scale-in">
             {options.map((opt) => {
               const isSelected = selectedValues.includes(opt.value);
               return (
                 <button
                   key={opt.value}
+                  role="option"
+                  aria-selected={isSelected}
                   onClick={() => {
                     if (isSelected) {
                       onChange(selectedValues.filter((v) => v !== opt.value));
@@ -497,9 +502,16 @@ export function SortableHeader({
   align?: "left" | "center" | "right";
 }) {
   const isActive = currentSort.key === sortKey;
+  const ariaSortValue = isActive
+    ? currentSort.direction === "asc" ? "ascending" : "descending"
+    : "none";
   return (
     <th
+      role="columnheader"
+      aria-sort={ariaSortValue}
+      tabIndex={0}
       onClick={() => onSort(sortKey)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSort(sortKey); } }}
       className={cn(
         "cursor-pointer select-none group",
         align === "right" && "text-right",
@@ -545,6 +557,7 @@ export function PaginationBar({
 }) {
   if (totalItems === 0) return null;
 
+  // Show simplified bar for single page (rows-per-page + count still visible)
   const start = (page - 1) * limit + 1;
   const end = Math.min(page * limit, totalItems);
 
@@ -582,7 +595,7 @@ export function PaginationBar({
           </select>
         )}
       </div>
-      <div className="flex items-center gap-1">
+      {totalPages > 1 && <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(1)}
           disabled={page <= 1}
@@ -635,7 +648,7 @@ export function PaginationBar({
         >
           <ChevronsRight size={14} />
         </button>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -662,13 +675,13 @@ export function BulkActionsBar({
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg animate-fade-in">
       <span className="text-sm font-medium text-blue-700">
-        {selectedCount} of {totalCount} selected
+        {selectedCount} of {totalCount} selected on this page
       </span>
       <button
         onClick={selectedCount === totalCount ? onDeselectAll : onSelectAll}
         className="text-xs text-blue-600 hover:text-blue-800 font-medium underline"
       >
-        {selectedCount === totalCount ? "Deselect all" : "Select all"}
+        {selectedCount === totalCount ? "Deselect all on this page" : "Select all on this page"}
       </button>
       <div className="h-4 w-px bg-blue-200" />
       {actions.map((action) => {
@@ -916,5 +929,46 @@ export function DataGrid<T extends Record<string, any>>({
         </table>
       </div>
     </div>
+  );
+}
+
+// ============================================================
+// FilterCollapse — collapses filter bar on mobile (<768px)
+// ============================================================
+
+export function FilterCollapse({
+  children,
+  activeCount = 0,
+}: {
+  children: React.ReactNode;
+  activeCount?: number;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      {/* Mobile toggle — visible only below md */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="md:hidden flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-[var(--border)] rounded-lg bg-white hover:bg-slate-50 transition-colors"
+        aria-expanded={open}
+      >
+        <Filter size={14} />
+        Filters
+        {activeCount > 0 && (
+          <span className="px-1.5 py-0.5 bg-[var(--brand-blue)] text-white text-[10px] rounded-full font-bold">
+            {activeCount}
+          </span>
+        )}
+      </button>
+      {/* Desktop: always visible. Mobile: toggled */}
+      <div className={cn(
+        "flex items-center gap-3 flex-wrap",
+        "md:flex",
+        open ? "flex" : "hidden md:flex"
+      )}>
+        {children}
+      </div>
+    </>
   );
 }

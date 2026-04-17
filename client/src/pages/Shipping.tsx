@@ -246,7 +246,7 @@ export default function Shipping() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         <div className="kpi-card kpi-blue card-hover">
           <div className="flex items-center gap-2 mb-1"><Truck size={16} className="text-blue-500" /></div>
           <p className="text-2xl font-bold font-body">{stats.total}</p>
@@ -308,12 +308,21 @@ export default function Shipping() {
 
       {/* Active Filters */}
       <ActiveFilters
-        filters={grid.filters}
-        filterConfigs={dynamicFilterConfigs}
+        filters={{
+          ...grid.filters,
+          ...(dateStart || dateEnd ? { __dateRange: `${dateStart || "..."} to ${dateEnd || "..."}` } : {}),
+        }}
+        filterConfigs={[
+          ...dynamicFilterConfigs,
+          { key: "__dateRange", label: "Date range", type: "select" as const },
+        ]}
         search={grid.search}
-        onRemoveFilter={(key) => grid.setFilter(key, key === "carrier" ? [] : "")}
+        onRemoveFilter={(key) => {
+          if (key === "__dateRange") { setDateStart(""); setDateEnd(""); return; }
+          grid.setFilter(key, key === "carrier" ? [] : "");
+        }}
         onClearSearch={() => grid.setSearch("")}
-        onClearAll={grid.clearFilters}
+        onClearAll={() => { grid.clearFilters(); setActiveTab("all"); setDateStart(""); setDateEnd(""); }}
       />
 
       {/* Tab Bar */}

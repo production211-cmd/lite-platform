@@ -152,7 +152,7 @@ export default function Payouts() {
         <ExportButton onClick={() => alert("Export feature coming soon")} label="Export CSV" />
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="kpi-card kpi-green card-hover">
           <DollarSign size={16} className="text-green-500 mb-1" />
           <p className="text-2xl font-bold font-body">{formatCurrency(stats.totalDisbursed)}</p>
@@ -182,7 +182,7 @@ export default function Payouts() {
         ))}
       </div>
 
-      <ActiveFilters filters={grid.filters} filterConfigs={dynamicFilterConfigs} search={grid.search} onRemoveFilter={(key) => grid.setFilter(key, key === "vendorName" || key === "currency" ? [] : "")} onClearSearch={() => grid.setSearch("")} onClearAll={grid.clearFilters} />
+      <ActiveFilters filters={grid.filters} filterConfigs={dynamicFilterConfigs} search={grid.search} onRemoveFilter={(key) => grid.setFilter(key, key === "vendorName" || key === "currency" ? [] : "")} onClearSearch={() => grid.setSearch("")} onClearAll={() => { grid.clearFilters(); setActiveTab("all"); }} />
 
       <div className="tab-bar">
         {STATUS_TABS.map((tab) => (

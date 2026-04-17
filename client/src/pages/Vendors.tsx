@@ -231,7 +231,7 @@ export default function Vendors() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="quick-stat card-hover">
           <p className="stat-number">{normalized.length}</p>
           <p className="stat-label">Total Vendors</p>
@@ -269,10 +269,10 @@ export default function Vendors() {
           />
         ))}
         <div className="flex items-center bg-gray-100 rounded-lg p-0.5 ml-auto">
-          <button onClick={() => setView("grid")} className={cn("p-2 rounded-md transition-colors", view === "grid" ? "bg-white shadow-sm" : "text-gray-500")}>
+          <button onClick={() => setView("grid")} aria-label="Grid view" aria-pressed={view === "grid"} className={cn("p-2 rounded-md transition-colors", view === "grid" ? "bg-white shadow-sm" : "text-gray-500")}>
             <Grid3X3 size={16} />
           </button>
-          <button onClick={() => setView("list")} className={cn("p-2 rounded-md transition-colors", view === "list" ? "bg-white shadow-sm" : "text-gray-500")}>
+          <button onClick={() => setView("list")} aria-label="List view" aria-pressed={view === "list"} className={cn("p-2 rounded-md transition-colors", view === "list" ? "bg-white shadow-sm" : "text-gray-500")}>
             <List size={16} />
           </button>
         </div>
@@ -285,7 +285,7 @@ export default function Vendors() {
         search={grid.search}
         onRemoveFilter={(key) => grid.setFilter(key, key === "integrationType" ? [] : "")}
         onClearSearch={() => grid.setSearch("")}
-        onClearAll={grid.clearFilters}
+        onClearAll={() => { grid.clearFilters(); setActiveTab("all"); }}
       />
 
       {/* Tab Bar */}

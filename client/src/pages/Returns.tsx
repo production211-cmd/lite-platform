@@ -208,7 +208,7 @@ export default function Returns() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         <div className="kpi-card kpi-purple card-hover">
           <RotateCcw size={16} className="text-purple-500 mb-1" />
           <p className="text-2xl font-bold font-body">{stats.total}</p>
@@ -270,12 +270,21 @@ export default function Returns() {
 
       {/* Active Filters */}
       <ActiveFilters
-        filters={grid.filters}
-        filterConfigs={dynamicFilterConfigs}
+        filters={{
+          ...grid.filters,
+          ...(dateStart || dateEnd ? { __dateRange: `${dateStart || "..."} to ${dateEnd || "..."}` } : {}),
+        }}
+        filterConfigs={[
+          ...dynamicFilterConfigs,
+          { key: "__dateRange", label: "Date range", type: "select" as const },
+        ]}
         search={grid.search}
-        onRemoveFilter={(key) => grid.setFilter(key, key === "vendorName" || key === "reason" ? [] : "")}
+        onRemoveFilter={(key) => {
+          if (key === "__dateRange") { setDateStart(""); setDateEnd(""); return; }
+          grid.setFilter(key, key === "vendorName" || key === "reason" ? [] : "");
+        }}
         onClearSearch={() => grid.setSearch("")}
-        onClearAll={grid.clearFilters}
+        onClearAll={() => { grid.clearFilters(); setActiveTab("all"); setDateStart(""); setDateEnd(""); }}
       />
 
       {/* Tab Bar */}

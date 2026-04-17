@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Link } from "wouter";
 import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
@@ -12,20 +12,11 @@ import {
   type ColumnDef, type FilterConfig,
 } from "@/components/DataGrid";
 
-const VENDOR_COLORS: Record<string, string> = {};
 const COLOR_PALETTE = [
   "#0d9488", "#7c3aed", "#db2777", "#ea580c", "#2563eb",
   "#059669", "#d97706", "#4f46e5", "#be123c", "#0891b2",
   "#7c2d12", "#6d28d9",
 ];
-let colorIdx = 0;
-function getVendorColor(name: string) {
-  if (!VENDOR_COLORS[name]) {
-    VENDOR_COLORS[name] = COLOR_PALETTE[colorIdx % COLOR_PALETTE.length];
-    colorIdx++;
-  }
-  return VENDOR_COLORS[name];
-}
 
 const TABS = [
   { key: "all", label: "All" },
@@ -68,6 +59,15 @@ const FILTER_CONFIGS: FilterConfig[] = [
 ];
 
 export default function Orders() {
+  const vendorColorsRef = useRef<Record<string, string>>({});
+  const colorIdxRef = useRef(0);
+  const getVendorColor = (name: string) => {
+    if (!vendorColorsRef.current[name]) {
+      vendorColorsRef.current[name] = COLOR_PALETTE[colorIdxRef.current % COLOR_PALETTE.length];
+      colorIdxRef.current++;
+    }
+    return vendorColorsRef.current[name];
+  };
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
@@ -250,7 +250,7 @@ export default function Orders() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {[
           { label: "Total", value: stats.total },
           { label: "Pending", value: stats.pending },
@@ -303,12 +303,21 @@ export default function Orders() {
 
       {/* Active Filters */}
       <ActiveFilters
-        filters={grid.filters}
-        filterConfigs={dynamicFilterConfigs}
+        filters={{
+          ...grid.filters,
+          ...(dateStart || dateEnd ? { __dateRange: `${dateStart || "..."} to ${dateEnd || "..."}` } : {}),
+        }}
+        filterConfigs={[
+          ...dynamicFilterConfigs,
+          { key: "__dateRange", label: "Date range", type: "select" as const },
+        ]}
         search={grid.search}
-        onRemoveFilter={(key) => grid.setFilter(key, key === "vendorName" ? [] : "")}
+        onRemoveFilter={(key) => {
+          if (key === "__dateRange") { setDateStart(""); setDateEnd(""); return; }
+          grid.setFilter(key, key === "vendorName" ? [] : "");
+        }}
         onClearSearch={() => grid.setSearch("")}
-        onClearAll={grid.clearFilters}
+        onClearAll={() => { grid.clearFilters(); setActiveTab("all"); setDateStart(""); setDateEnd(""); }}
       />
 
       {/* Tab Bar */}
