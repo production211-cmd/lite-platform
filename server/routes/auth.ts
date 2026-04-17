@@ -63,6 +63,19 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({ error: "Invalid credentials" });
     }
 
+    // Fetch portalType from VendorAccess (bypass RLS with SET LOCAL)
+    let portalType: string | null = null;
+    if (user.role === "VENDOR" && user.vendorId) {
+      const vaRows: any[] = await prisma.$transaction(async (tx: any) => {
+        await tx.$executeRawUnsafe(`SET LOCAL app.current_user_role = 'RETAILER_LT'`);
+        return tx.$queryRawUnsafe(
+          `SELECT "portalType" FROM "VendorAccess" WHERE "userId" = $1 LIMIT 1`,
+          user.id
+        );
+      });
+      portalType = vaRows[0]?.portalType || null;
+    }
+
     // Update last login
     await prisma.user.update({
       where: { id: user.id },
@@ -92,6 +105,7 @@ export async function authRoutes(app: FastifyInstance) {
         role: user.role,
         vendorId: user.vendorId,
         vendorName: user.vendor?.name,
+        portalType,
       },
     };
   });
@@ -170,6 +184,19 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: "User not found" });
     }
 
+    // Fetch portalType from VendorAccess (bypass RLS with SET LOCAL)
+    let portalType: string | null = null;
+    if (user.role === "VENDOR" && user.vendorId) {
+      const vaRows: any[] = await prisma.$transaction(async (tx: any) => {
+        await tx.$executeRawUnsafe(`SET LOCAL app.current_user_role = 'RETAILER_LT'`);
+        return tx.$queryRawUnsafe(
+          `SELECT "portalType" FROM "VendorAccess" WHERE "userId" = $1 LIMIT 1`,
+          user.id
+        );
+      });
+      portalType = vaRows[0]?.portalType || null;
+    }
+
     return {
       id: user.id,
       email: user.email,
@@ -178,6 +205,7 @@ export async function authRoutes(app: FastifyInstance) {
       role: user.role,
       vendorId: user.vendorId,
       vendorName: user.vendor?.name,
+      portalType,
       lastLoginAt: user.lastLoginAt,
     };
   });

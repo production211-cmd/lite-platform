@@ -54,9 +54,9 @@ export default function PendingProducts() {
   const normalized = useMemo(() =>
     products.map((p) => ({
       ...p,
-      vendorName: p.vendor?.name || "Unknown",
-      price: p.retailPrice || 0,
-      enrichment: p.enrichmentScore || 0,
+      vendorName: p.vendor?.name || p.vendor?.companyName || "Unknown",
+      price: p.salesPrice || p.retailPrice || 0,
+      enrichment: (p.enrichmentScore || 0) / 100, // DB stores 0-100, UI expects 0-1
       date: p.createdAt || "",
     })),
   [products]);

@@ -73,11 +73,11 @@ export default function VendorFinance() {
             <table className="w-full data-table">
               <thead>
                 <tr className="bg-slate-50/80">
-                  <th>Period</th>
-                  <th>Gross</th>
-                  <th>Commission</th>
-                  <th>Deductions</th>
-                  <th>Net Amount</th>
+                  <th>Cycle</th>
+                  <th>Amount</th>
+                  <th>Vendor</th>
+                  <th>Ref</th>
+                  <th>Net</th>
                   <th>Status</th>
                   <th>Date</th>
                 </tr>
@@ -86,12 +86,12 @@ export default function VendorFinance() {
                 {payouts.map((p: any) => (
                   <tr key={p.id}>
                     <td className="text-xs">
-                      {p.periodStart ? `${formatDate(p.periodStart)} – ${formatDate(p.periodEnd)}` : "—"}
+                      {p.payoutCycle || "\u2014"}
                     </td>
-                    <td className="text-xs">{formatCurrency(p.grossAmount || 0, p.currency)}</td>
-                    <td className="text-xs text-red-600">-{formatCurrency(p.commissionAmount || 0, p.currency)}</td>
-                    <td className="text-xs text-red-600">-{formatCurrency(p.deductionAmount || 0, p.currency)}</td>
-                    <td className="text-xs font-bold">{formatCurrency(p.netAmount || 0, p.currency)}</td>
+                    <td className="text-xs">{formatCurrency(p.amount || 0, p.currency)}</td>
+                    <td className="text-xs">{p.vendor?.name || "\u2014"}</td>
+                    <td className="text-xs font-mono">{p.processorRef || "\u2014"}</td>
+                    <td className="text-xs font-bold">{formatCurrency(p.amount || 0, p.currency)}</td>
                     <td><StatusBadge status={p.status} size="xs" /></td>
                     <td className="text-xs text-slate-500">{timeAgo(p.createdAt)}</td>
                   </tr>

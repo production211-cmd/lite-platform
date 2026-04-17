@@ -100,11 +100,11 @@ class ApiClient {
   }
 
   logout() {
-    return this.request<any>("/auth/logout", { method: "POST" });
+    return this.request<any>("/auth/logout", { method: "POST", body: "{}" });
   }
 
   logoutAll() {
-    return this.request<any>("/auth/logout-all", { method: "POST" });
+    return this.request<any>("/auth/logout-all", { method: "POST", body: "{}" });
   }
 
   // ============================================================
@@ -201,15 +201,15 @@ class ApiClient {
   }
 
   approveProduct(id: string) {
-    return this.request<any>(`/products/${id}/approve`, { method: "POST" });
+    return this.request<any>(`/products/${id}/approve`, { method: "POST", body: "{}" });
   }
 
   pushProduct(id: string) {
-    return this.request<any>(`/products/${id}/push`, { method: "POST" });
+    return this.request<any>(`/products/${id}/push`, { method: "POST", body: "{}" });
   }
 
-  rejectProduct(id: string) {
-    return this.request<any>(`/products/${id}/reject`, { method: "POST" });
+  rejectProduct(id: string, reason?: string) {
+    return this.request<any>(`/products/${id}/reject`, { method: "POST", body: JSON.stringify({ reason: reason || "Rejected by admin" }) });
   }
 
   getProductCategories() {
@@ -238,11 +238,10 @@ class ApiClient {
   }
 
   acceptOrder(vendorOrderId: string) {
-    return this.request<any>(`/orders/${vendorOrderId}/accept`, { method: "POST" });
+    return this.request<any>(`/orders/${vendorOrderId}/accept`, { method: "POST", body: "{}" });
   }
-
   rejectOrder(vendorOrderId: string) {
-    return this.request<any>(`/orders/${vendorOrderId}/reject`, { method: "POST" });
+    return this.request<any>(`/orders/${vendorOrderId}/reject`, { method: "POST", body: "{}" });
   }
 
   // ============================================================
