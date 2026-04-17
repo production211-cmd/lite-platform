@@ -4,10 +4,22 @@ export async function dashboardRoutes(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
   /**
-   * Helper: run all queries inside a single interactive transaction so they share
-   * the same Prisma pool connection (and therefore the same RLS session variables
-   * set by the preHandler hook).
+   * Helper: set RLS context inside a transaction. Fail-closed: if no authUser,
+   * set a sentinel role that matches no RLS policy rows.
    */
+  async function setRlsContext(tx: any, request: any) {
+    const user = (request as any).authUser;
+    const role = user?.role || 'NONE';
+    const vendorId = user?.vendorId || '__NONE__';
+    await tx.$executeRawUnsafe(
+      `SELECT set_config('app.current_user_role', $1, true)`,
+      role
+    );
+    await tx.$executeRawUnsafe(
+      `SELECT set_config('app.current_vendor_id', $1, true)`,
+      vendorId
+    );
+  }
 
   // GET /api/dashboard/kpis
   app.get("/kpis", async (request) => {
@@ -29,18 +41,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     // Use interactive transaction to ensure RLS context is on the same connection
     return prisma.$transaction(async (tx: any) => {
-      // Re-set RLS context inside the transaction to guarantee it's on this connection
-      const user = (request as any).authUser;
-      if (user) {
-        await tx.$executeRawUnsafe(
-          `SELECT set_config('app.current_user_role', $1, true)`,
-          user.role
-        );
-        await tx.$executeRawUnsafe(
-          `SELECT set_config('app.current_vendor_id', $1, true)`,
-          user.vendorId || "__NONE__"
-        );
-      }
+      await setRlsContext(tx, request);
 
       const [
         totalOrders, totalProducts, totalVendors, activeVendors,
@@ -153,17 +154,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
   // GET /api/dashboard/recent-orders
   app.get("/recent-orders", async (request) => {
     return prisma.$transaction(async (tx: any) => {
-      const user = (request as any).authUser;
-      if (user) {
-        await tx.$executeRawUnsafe(
-          `SELECT set_config('app.current_user_role', $1, true)`,
-          user.role
-        );
-        await tx.$executeRawUnsafe(
-          `SELECT set_config('app.current_vendor_id', $1, true)`,
-          user.vendorId || "__NONE__"
-        );
-      }
+      await setRlsContext(tx, request);
 
       const orders = await tx.marketplaceOrder.findMany({
         take: 10,
@@ -188,17 +179,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
   // GET /api/dashboard/top-vendors
   app.get("/top-vendors", async (request) => {
     return prisma.$transaction(async (tx: any) => {
-      const user = (request as any).authUser;
-      if (user) {
-        await tx.$executeRawUnsafe(
-          `SELECT set_config('app.current_user_role', $1, true)`,
-          user.role
-        );
-        await tx.$executeRawUnsafe(
-          `SELECT set_config('app.current_vendor_id', $1, true)`,
-          user.vendorId || "__NONE__"
-        );
-      }
+      await setRlsContext(tx, request);
 
       const vendors = await tx.vendor.findMany({
         where: { isActive: true },
@@ -232,17 +213,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
   // GET /api/dashboard/revenue-chart
   app.get("/revenue-chart", async (request) => {
     return prisma.$transaction(async (tx: any) => {
-      const user = (request as any).authUser;
-      if (user) {
-        await tx.$executeRawUnsafe(
-          `SELECT set_config('app.current_user_role', $1, true)`,
-          user.role
-        );
-        await tx.$executeRawUnsafe(
-          `SELECT set_config('app.current_vendor_id', $1, true)`,
-          user.vendorId || "__NONE__"
-        );
-      }
+      await setRlsContext(tx, request);
 
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -269,17 +240,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
   // GET /api/dashboard/order-status-breakdown
   app.get("/order-status-breakdown", async (request) => {
     return prisma.$transaction(async (tx: any) => {
-      const user = (request as any).authUser;
-      if (user) {
-        await tx.$executeRawUnsafe(
-          `SELECT set_config('app.current_user_role', $1, true)`,
-          user.role
-        );
-        await tx.$executeRawUnsafe(
-          `SELECT set_config('app.current_vendor_id', $1, true)`,
-          user.vendorId || "__NONE__"
-        );
-      }
+      await setRlsContext(tx, request);
 
       const statuses = await tx.marketplaceOrder.groupBy({
         by: ["status"],

@@ -13,26 +13,34 @@ export default function Dashboard() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [topVendors, setTopVendors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState("month");
 
-  const load = async () => {
+  const load = async (range?: string) => {
     setLoading(true);
+    setError(null);
     try {
       const [k, orders, vendors] = await Promise.all([
-        api.getDashboardKPIs(),
+        api.getDashboardKPIs(range || dateRange),
         api.getRecentOrders(),
         api.getTopVendors(),
       ]);
       setKpis(k);
       setRecentOrders(orders);
       setTopVendors(vendors);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Dashboard load error:", err);
+      setError(err?.message || "Failed to load dashboard data");
     }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+
+  const handleDateRange = (range: string) => {
+    setDateRange(range);
+    if (range !== 'custom') load(range);
+  };
 
   if (loading && !kpis) {
     return (
@@ -94,7 +102,7 @@ export default function Dashboard() {
           <p className="text-sm text-gray-400 font-body mt-1">Real-time metrics from synced L&T orders</p>
         </div>
         <button
-          onClick={load}
+          onClick={() => load()}
           className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-body"
         >
           <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
@@ -107,7 +115,7 @@ export default function Dashboard() {
         {["today", "week", "month", "custom"].map((range) => (
           <button
             key={range}
-            onClick={() => setDateRange(range)}
+            onClick={() => handleDateRange(range)}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold font-body transition-colors ${
               dateRange === range
                 ? "bg-gray-900 text-white"
@@ -119,6 +127,14 @@ export default function Dashboard() {
         ))}
         <span className="text-xs text-gray-400 font-body ml-2">{dateRangeLabel}</span>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center justify-between">
+          <span className="text-sm text-red-700 font-body">{error}</span>
+          <button onClick={() => load()} className="text-xs font-semibold text-red-600 hover:text-red-800 font-body">Retry</button>
+        </div>
+      )}
 
       {/* ACTION REQUIRED Section */}
       <div className="bg-white rounded-lg border border-gray-200 p-5">

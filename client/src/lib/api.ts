@@ -110,8 +110,9 @@ class ApiClient {
   // ============================================================
   // Dashboard
   // ============================================================
-  getDashboardKPIs() {
-    return this.request<any>("/dashboard/kpis");
+  getDashboardKPIs(range?: string) {
+    const params = range && range !== 'custom' ? `?range=${range}` : '';
+    return this.request<any>(`/dashboard/kpis${params}`);
   }
 
   getRecentOrders() {

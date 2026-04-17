@@ -117,7 +117,14 @@ export default function Settings() {
   const [settings, setSettings] = useState<PlatformSettings>(loadSettings);
   const [saving, setSaving] = useState(false);
 
+  const isValidHex = (v: string) => /^#[0-9a-fA-F]{0,6}$/.test(v);
+
   const updateSettings = useCallback((section: keyof PlatformSettings, data: any) => {
+    // B4 fix: validate color hex values before applying
+    if (section === 'branding') {
+      if (data.primaryColor !== undefined && !isValidHex(data.primaryColor)) return;
+      if (data.accentColor !== undefined && !isValidHex(data.accentColor)) return;
+    }
     setSettings((prev) => {
       const updated = { ...prev, [section]: { ...prev[section], ...data } };
       return updated;
