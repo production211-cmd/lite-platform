@@ -1,46 +1,52 @@
 @import "tailwindcss";
 
-/* LITE Platform Design System
- * Design Philosophy: Clean enterprise SaaS with luxury undertones
- * Color: Deep navy/slate base, gold accent, clean whites
- * Typography: DM Sans for headings, Inter for body
+/* LITE Marketplace Design System — matching litemarketplace.com exactly
+ * Body font: "Nunito Sans", sans-serif
+ * Heading font: "Cinzel", serif (small-caps, luxury)
+ * Sidebar: #232323, Active: #3a3a3a, Width: w-72 (288px)
+ * Page bg: #F5F6F7, Cards: white, Borders: #e5e7eb
+ * Store badge: #1e3a5f, Icons: Lucide React
  */
 
 :root {
-  --background: #fafbfc;
-  --foreground: #0f172a;
+  --background: #F5F6F7;
+  --foreground: #1f2937;
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #111827;
   --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #1e293b;
-  --primary-foreground: #f8fafc;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #1e293b;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #c8a45c;
-  --accent-foreground: #1e293b;
+  --popover-foreground: #111827;
+  --primary: #232323;
+  --primary-foreground: #ffffff;
+  --secondary: #f9fafb;
+  --secondary-foreground: #111827;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --accent: #1e3a5f;
+  --accent-foreground: #ffffff;
   --destructive: #ef4444;
-  --destructive-foreground: #fafafa;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #c8a45c;
+  --destructive-foreground: #ffffff;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #1e3a5f;
   --radius: 0.5rem;
 
   /* Status colors */
-  --success: #10b981;
-  --warning: #f59e0b;
+  --success: #22c55e;
+  --warning: #eab308;
   --info: #3b82f6;
   --danger: #ef4444;
 
   /* Sidebar */
-  --sidebar-bg: #0f172a;
-  --sidebar-fg: #cbd5e1;
-  --sidebar-active: #c8a45c;
-  --sidebar-hover: #1e293b;
-  --sidebar-width: 260px;
+  --sidebar-bg: #232323;
+  --sidebar-active: #3a3a3a;
+  --sidebar-text: #ffffff;
+  --sidebar-muted: #9ca3af;
+  --sidebar-width: 288px;
   --sidebar-collapsed-width: 72px;
+
+  /* Brand */
+  --brand-blue: #1e3a5f;
+  --brand-gold: #c8a45c;
 }
 
 * {
@@ -50,7 +56,7 @@
 }
 
 body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background-color: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
@@ -58,8 +64,8 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: "DM Sans", "Inter", sans-serif;
-  font-weight: 600;
+  font-family: "Cinzel", serif;
+  font-weight: 400;
 }
 
 /* Scrollbar styling */
@@ -73,25 +79,85 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d1d5db;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #9ca3af;
 }
 
 /* Utility classes */
-.text-gold { color: var(--accent); }
-.bg-gold { background-color: var(--accent); }
-.border-gold { border-color: var(--accent); }
+.font-heading { font-family: "Cinzel", serif; }
+.font-body { font-family: "Nunito Sans", sans-serif; }
+.small-caps { font-variant: small-caps; letter-spacing: 0.05em; }
 
 /* Status badge colors */
-.status-success { background-color: #dcfce7; color: #166534; }
+.status-pending { background-color: #fef3c7; color: #92400e; }
+.status-processing { background-color: #dbeafe; color: #1e40af; }
+.status-delivered { background-color: #d1fae5; color: #065f46; }
+.status-shipped { background-color: #e0e7ff; color: #3730a3; }
+.status-settled { background-color: #d1fae5; color: #065f46; }
+.status-transit { background-color: #dbeafe; color: #1e40af; }
+.status-cancelled { background-color: #fee2e2; color: #991b1b; }
+.status-success { background-color: #d1fae5; color: #065f46; }
 .status-warning { background-color: #fef3c7; color: #92400e; }
 .status-danger { background-color: #fee2e2; color: #991b1b; }
 .status-info { background-color: #dbeafe; color: #1e40af; }
-.status-neutral { background-color: #f1f5f9; color: #475569; }
+.status-neutral { background-color: #f3f4f6; color: #6b7280; }
+
+/* KPI Card */
+.kpi-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--success);
+}
+
+/* Data table styling */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table thead {
+  background: var(--secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table th {
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+
+.data-table td {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--card-foreground);
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table tbody tr:hover {
+  background: var(--secondary);
+}
 
 /* Animations */
 @keyframes fadeIn {
@@ -110,28 +176,6 @@ h1, h2, h3, h4, h5, h6 {
 
 .animate-slide-in {
   animation: slideIn 0.3s ease-out;
-}
-
-/* Data table styling */
-.data-table th {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted-foreground);
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-}
-
-.data-table td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.875rem;
-}
-
-.data-table tr:hover {
-  background-color: var(--secondary);
 }
 
 /* Card hover effect */
