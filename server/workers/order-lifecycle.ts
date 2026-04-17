@@ -11,6 +11,12 @@
  * 5. Derive and update MarketplaceOrder aggregate status
  *
  * Illegal transitions → throw → job goes to dead-letter queue.
+ *
+ * Hardened per Perplexity audit Round 3:
+ * - Custom jobId for deduplication
+ * - stalledInterval + maxStalledCount for stall detection
+ * - lockDuration tuned for DB transaction time
+ * - Metrics enabled
  */
 
 import { Worker, Job } from "bullmq";
@@ -142,7 +148,7 @@ async function processOrderLifecycle(job: Job<OrderLifecycleJob>) {
 }
 
 // ============================================================
-// Worker Instance
+// Worker Instance (Hardened)
 // ============================================================
 
 export function createOrderLifecycleWorker() {
@@ -156,6 +162,11 @@ export function createOrderLifecycleWorker() {
         max: 100,
         duration: 1000,
       },
+      // Hardened settings per audit
+      lockDuration: 30_000,         // 30s lock — enough for DB transaction
+      stalledInterval: 15_000,      // Check for stalled jobs every 15s
+      maxStalledCount: 2,           // Mark as stalled after 2 missed heartbeats
+      metrics: { maxDataPoints: 1000 }, // Enable BullMQ metrics
     }
   );
 
@@ -165,6 +176,10 @@ export function createOrderLifecycleWorker() {
 
   worker.on("failed", (job, err) => {
     console.error(`[order-lifecycle] ❌ Job ${job?.id} failed:`, err.message);
+  });
+
+  worker.on("stalled", (jobId) => {
+    console.warn(`[order-lifecycle] ⚠️ Job ${jobId} stalled — will be retried`);
   });
 
   worker.on("error", (err) => {

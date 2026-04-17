@@ -7,7 +7,7 @@
  */
 
 import { Worker, Job } from "bullmq";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, ShipmentStatus } from "@prisma/client";
 import {
   QUEUE_NAMES,
   redisConnection,
@@ -55,8 +55,8 @@ const TRACKING_HANDLERS: Record<string, (tn: string) => Promise<TrackingEvent[]>
 
 function mapTrackingStatusToShipmentStatus(
   trackingStatus: string
-): any {
-  const mapping: Record<string, string> = {
+): ShipmentStatus | null {
+  const mapping: Record<string, ShipmentStatus> = {
     picked_up: "PICKED_UP",
     in_transit: "IN_TRANSIT",
     out_for_delivery: "OUT_FOR_DELIVERY",
@@ -169,6 +169,11 @@ export function createTrackingUpdateWorker() {
     {
       connection: redisConnection,
       concurrency: 10,
+      // Hardened settings per audit
+      lockDuration: 30_000,         // 30s lock — carrier APIs can be slow
+      stalledInterval: 15_000,      // Check for stalled jobs every 15s
+      maxStalledCount: 2,           // Mark as stalled after 2 missed heartbeats
+      metrics: { maxDataPoints: 1000 }, // Enable BullMQ metrics
     }
   );
 
@@ -178,6 +183,10 @@ export function createTrackingUpdateWorker() {
 
   worker.on("failed", (job, err) => {
     console.error(`[tracking] ❌ Job ${job?.id} failed:`, err.message);
+  });
+
+  worker.on("stalled", (jobId) => {
+    console.warn(`[tracking] ⚠️ Job ${jobId} stalled — will be retried`);
   });
 
   return worker;

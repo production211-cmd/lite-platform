@@ -148,6 +148,11 @@ export function createCatalogEnrichmentWorker() {
         max: 10,
         duration: 1000,
       },
+      // Hardened settings per audit
+      lockDuration: 120_000,        // 120s lock — AI enrichment calls can be very slow
+      stalledInterval: 60_000,      // Check for stalled jobs every 60s
+      maxStalledCount: 2,           // Mark as stalled after 2 missed heartbeats
+      metrics: { maxDataPoints: 1000 }, // Enable BullMQ metrics
     }
   );
 
@@ -157,6 +162,10 @@ export function createCatalogEnrichmentWorker() {
 
   worker.on("failed", (job, err) => {
     console.error(`[enrichment] ❌ Job ${job?.id} failed:`, err.message);
+  });
+
+  worker.on("stalled", (jobId) => {
+    console.warn(`[enrichment] ⚠️ Job ${jobId} stalled — will be retried`);
   });
 
   return worker;

@@ -248,6 +248,11 @@ export function createSettlementWorker() {
       connection: redisConnection,
       concurrency: 5,
       limiter: { max: 20, duration: 1000 },
+      // Hardened settings per audit
+      lockDuration: 60_000,         // 60s lock — payment APIs can be very slow
+      stalledInterval: 30_000,      // Check for stalled jobs every 30s
+      maxStalledCount: 1,           // Strict: mark as stalled after 1 missed heartbeat (payments are critical)
+      metrics: { maxDataPoints: 1000 }, // Enable BullMQ metrics
     }
   );
 
@@ -257,6 +262,10 @@ export function createSettlementWorker() {
 
   worker.on("failed", (job, err) => {
     console.error(`[settlement] ❌ Job ${job?.id} failed:`, err.message);
+  });
+
+  worker.on("stalled", (jobId) => {
+    console.warn(`[settlement] ⚠️ Job ${jobId} stalled — will be retried`);
   });
 
   return worker;

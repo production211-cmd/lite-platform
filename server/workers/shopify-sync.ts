@@ -182,6 +182,11 @@ export function createShopifySyncWorker() {
     {
       connection: redisConnection,
       concurrency: 5,
+      // Hardened settings per audit
+      lockDuration: 60_000,         // 60s lock — Shopify API pagination can be slow
+      stalledInterval: 30_000,      // Check for stalled jobs every 30s
+      maxStalledCount: 2,           // Mark as stalled after 2 missed heartbeats
+      metrics: { maxDataPoints: 1000 }, // Enable BullMQ metrics
     }
   );
 
@@ -191,6 +196,10 @@ export function createShopifySyncWorker() {
 
   worker.on("failed", (job, err) => {
     console.error(`[shopify-sync] ❌ Job ${job?.id} failed:`, err.message);
+  });
+
+  worker.on("stalled", (jobId) => {
+    console.warn(`[shopify-sync] ⚠️ Job ${jobId} stalled — will be retried`);
   });
 
   return worker;

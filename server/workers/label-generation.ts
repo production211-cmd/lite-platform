@@ -194,6 +194,11 @@ export function createLabelGenerationWorker() {
     {
       connection: redisConnection,
       concurrency: 5,
+      // Hardened settings per audit
+      lockDuration: 30_000,         // 30s lock — carrier API calls can be slow
+      stalledInterval: 15_000,      // Check for stalled jobs every 15s
+      maxStalledCount: 2,           // Mark as stalled after 2 missed heartbeats
+      metrics: { maxDataPoints: 1000 }, // Enable BullMQ metrics
     }
   );
 
@@ -203,6 +208,10 @@ export function createLabelGenerationWorker() {
 
   worker.on("failed", (job, err) => {
     console.error(`[label-gen] ❌ Job ${job?.id} failed:`, err.message);
+  });
+
+  worker.on("stalled", (jobId) => {
+    console.warn(`[label-gen] ⚠️ Job ${jobId} stalled — will be retried`);
   });
 
   return worker;

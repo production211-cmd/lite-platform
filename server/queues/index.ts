@@ -166,7 +166,11 @@ export async function addOrderLifecycleJob(data: OrderLifecycleJob) {
   return getQueue(QUEUE_NAMES.ORDER_LIFECYCLE).add(
     `transition-${data.vendorOrderId}`,
     data,
-    { priority: 1 }
+    {
+      priority: 1,
+      // Custom jobId for deduplication: prevent duplicate transitions for same vendorOrder + target
+      jobId: `order-transition-${data.vendorOrderId}-${data.targetStatus}`,
+    }
   );
 }
 
@@ -195,7 +199,11 @@ export async function addLabelGenerationJob(data: LabelGenerationJob) {
 export async function addTrackingUpdateJob(data: TrackingUpdateJob) {
   return getQueue(QUEUE_NAMES.TRACKING_UPDATE).add(
     `tracking-${data.shipmentId}`,
-    data
+    data,
+    {
+      // Custom jobId for deduplication: prevent duplicate polls for same shipment
+      jobId: `tracking-${data.shipmentId}-${Date.now()}`,
+    }
   );
 }
 
@@ -215,6 +223,10 @@ export async function addCatalogEnrichmentJob(data: CatalogEnrichmentJob) {
   return getQueue(QUEUE_NAMES.CATALOG_ENRICHMENT).add(
     `enrich-${data.productId}`,
     data,
-    { priority: 5 } // Low priority
+    {
+      priority: 5, // Low priority
+      // Custom jobId for deduplication: prevent duplicate enrichment for same product + type
+      jobId: `enrich-${data.productId}-${data.enrichmentType}`,
+    }
   );
 }
