@@ -7,7 +7,7 @@ import {
   DollarSign, ChevronRight, ChevronDown, LogOut, User,
   Package, BarChart3, AlertTriangle, RotateCcw,
   Megaphone, CalendarDays, Settings, MessageSquare,
-  ChevronLeft, Activity, UserPlus, Bell, Menu, X,
+  ChevronLeft, Activity, UserPlus, Bell, Menu, X, Users,
 } from "lucide-react";
 
 interface NavChild {
@@ -79,7 +79,12 @@ const retailerNav: NavItem[] = [
   { label: "Marketing / Events", href: "/marketing", icon: CalendarDays },
   { label: "Analytics & Reports", href: "/analytics", icon: BarChart3 },
   { label: "Activity Log", href: "/activity", icon: Bell },
-  { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Settings", href: "/settings", icon: Settings,
+    children: [
+      { label: "General", href: "/settings" },
+      { label: "User Management", href: "/settings/users" },
+    ],
+  },
   { label: "Queue Monitor", href: "/admin/queues", icon: Activity }
 ];
 

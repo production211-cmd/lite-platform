@@ -34,6 +34,7 @@ import Settings from "@/pages/Settings";
 import QueueMonitor from "@/pages/QueueMonitor";
 import Issues from "@/pages/Issues";
 import ActivityLog from "@/pages/ActivityLog";
+import UserManagement from "@/pages/UserManagement";
 import Analytics from "@/pages/Analytics";
 import NotificationCenter from "@/pages/NotificationCenter";
 import {
@@ -98,6 +99,7 @@ function AdminContent() {
             <Route path="/analytics" component={Analytics} />
             {/* Settings & Admin */}
             <Route path="/settings" component={Settings} />
+            <Route path="/settings/users" component={UserManagement} />
             <Route path="/admin/queues" component={QueueMonitor} />
             {/* 404 */}
             <Route>

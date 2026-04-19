@@ -396,6 +396,31 @@ class ApiClient {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";
     return this.request<any>(`/queues/${name}/jobs${qs}`);
   }
+  // ============================================================
+  // User Management
+  // ============================================================
+  getUsers(params?: Record<string, string>) {
+    const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+    return this.request<any>(`/users${qs}`);
+  }
+  getUserStats() {
+    return this.request<any>("/users/stats");
+  }
+  getUser(id: string) {
+    return this.request<any>(`/users/${id}`);
+  }
+  updateUser(id: string, data: any) {
+    return this.request<any>(`/users/${id}`, { method: "PUT", body: JSON.stringify(data) });
+  }
+  deactivateUser(id: string) {
+    return this.request<any>(`/users/${id}/deactivate`, { method: "PUT", body: JSON.stringify({}) });
+  }
+  activateUser(id: string) {
+    return this.request<any>(`/users/${id}/activate`, { method: "PUT", body: JSON.stringify({}) });
+  }
+  resetUserPassword(id: string, newPassword: string) {
+    return this.request<any>(`/users/${id}/reset-password`, { method: "POST", body: JSON.stringify({ newPassword }) });
+  }
 }
 
 export const api = new ApiClient();

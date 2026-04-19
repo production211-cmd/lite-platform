@@ -34,6 +34,7 @@ import { dashboardRoutes } from "./routes/dashboard.js";
 import { analyticsRoutes } from "./routes/analytics.js";
 import { queueRoutes } from "./routes/queues.js";
 import { activityRoutes } from "./routes/activity.js";
+import { userRoutes } from "./routes/users.js";
 import { startAllWorkers, stopAllWorkers } from "./workers/index.js";
 import { closeAllQueues } from "./queues/index.js";
 
@@ -143,6 +144,7 @@ await app.register(dashboardRoutes, { prefix: "/api/dashboard" });
 await app.register(analyticsRoutes, { prefix: "/api/analytics" });
 await app.register(queueRoutes, { prefix: "/api/queues" });
 await app.register(activityRoutes, { prefix: "/api/activity" });
+await app.register(userRoutes, { prefix: "/api/users" });
 
 // ============================================================
 // Global Error Handler
