@@ -54,6 +54,11 @@ export async function settingsRoutes(app: FastifyInstance) {
     if (settings.length > 50) {
       return reply.status(400).send({ error: "Maximum 50 settings per request" });
     }
+    // Validate no empty values in bulk
+    const emptyKeys = settings.filter((s) => !s.key || String(s.value ?? "").trim() === "").map((s) => s.key || "(missing key)");
+    if (emptyKeys.length > 0) {
+      return reply.status(400).send({ error: `Empty value for keys: ${emptyKeys.join(", ")}` });
+    }
 
     const userId = (request as any).authUser?.id;
 
@@ -87,8 +92,8 @@ export async function settingsRoutes(app: FastifyInstance) {
       description?: string;
     };
 
-    if (value === undefined || value === null) {
-      return reply.status(400).send({ error: "Value is required" });
+    if (value === undefined || value === null || String(value).trim() === "") {
+      return reply.status(400).send({ error: "Value is required and cannot be empty" });
     }
 
     const userId = (request as any).authUser?.id;

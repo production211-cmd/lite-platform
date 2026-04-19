@@ -144,25 +144,28 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
   const markAsRead = useCallback(async (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    const prev = notifications;
+    setNotifications((p) => p.map((n) => (n.id === id ? { ...n, read: true } : n)));
     if (useApi) {
-      try { await api.markNotificationRead(id); } catch { /* optimistic update already applied */ }
+      try { await api.markNotificationRead(id); } catch { setNotifications(prev); }
     }
-  }, [useApi]);
+  }, [useApi, notifications]);
 
   const markAllAsRead = useCallback(async () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    const prev = notifications;
+    setNotifications((p) => p.map((n) => ({ ...n, read: true })));
     if (useApi) {
-      try { await api.markAllNotificationsRead(); } catch { /* optimistic update already applied */ }
+      try { await api.markAllNotificationsRead(); } catch { setNotifications(prev); }
     }
-  }, [useApi]);
+  }, [useApi, notifications]);
 
   const dismissNotification = useCallback(async (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    const prev = notifications;
+    setNotifications((p) => p.filter((n) => n.id !== id));
     if (useApi) {
-      try { await api.dismissNotification(id); } catch { /* optimistic update already applied */ }
+      try { await api.dismissNotification(id); } catch { setNotifications(prev); }
     }
-  }, [useApi]);
+  }, [useApi, notifications]);
 
   const addNotification = useCallback((n: Omit<Notification, "id" | "timestamp" | "read">) => {
     const newNotif: Notification = {

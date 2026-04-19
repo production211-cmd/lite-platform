@@ -29,14 +29,16 @@ export async function productRoutes(app: FastifyInstance) {
     if (minScore) where.enrichmentScore = { ...where.enrichmentScore, gte: parseInt(minScore) };
     if (maxScore) where.enrichmentScore = { ...where.enrichmentScore, lte: parseInt(maxScore) };
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const skip = (pageNum - 1) * limitNum;
 
     const { products, total } = await withRls(prisma, request, async (tx) => {
       const [products, total] = await Promise.all([
         tx.product.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take: limitNum,
           include: {
             vendor: { select: { id: true, name: true, slug: true, location: true } },
             images: { take: 3, orderBy: { position: "asc" } },
@@ -50,20 +52,22 @@ export async function productRoutes(app: FastifyInstance) {
       return { products, total };
     });
 
-    return { products, total, page: parseInt(page), limit: parseInt(limit) };
+    return { products, total, page: pageNum, limit: limitNum };
   });
 
   // GET /api/products/pending - pending review
   app.get("/pending", async (request) => {
     const { page = "1", limit = "20" } = request.query as any;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const skip = (pageNum - 1) * limitNum;
 
     const { products, total } = await withRls(prisma, request, async (tx) => {
       const [products, total] = await Promise.all([
         tx.product.findMany({
           where: { status: "PENDING_REVIEW", isDeleted: false },
           skip,
-          take: parseInt(limit),
+          take: limitNum,
           include: {
             vendor: { select: { id: true, name: true, slug: true } },
             images: { take: 1 },

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
 import { formatCurrency, timeAgo, cn } from "@/lib/utils";
 import { TopBar } from "@/components/TopBar";
@@ -122,6 +122,16 @@ export default function PendingProducts() {
     defaultLimit: 20,
   });
 
+  // Debounced search handler (300ms)
+  const [searchInput, setSearchInput] = useState("");
+  const debounceRef = useRef<number | undefined>(undefined);
+  const handleSearchChange = useCallback((val: string) => {
+    setSearchInput(val);
+    window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => grid.setSearch(val), 300);
+  }, [grid.setSearch]);
+  useEffect(() => () => window.clearTimeout(debounceRef.current), []);
+
   const selectAllOnPage = () => {
     if (selectedIds.size === grid.paginated.length) {
       setSelectedIds(new Set());
@@ -136,7 +146,7 @@ export default function PendingProducts() {
       <div className="p-6 space-y-5 page-enter">
         {/* Search + Filters */}
         <div className="flex items-center gap-3 flex-wrap">
-          <SearchBar value={grid.search} onChange={grid.setSearch} placeholder="Search by title, vendor, category..." className="flex-1 min-w-[250px]" />
+          <SearchBar value={searchInput} onChange={handleSearchChange} placeholder="Search by title, vendor, category..." className="flex-1 min-w-[250px]" />
           {dynamicFilterConfigs.map((fc) => (
             <FilterDropdown key={fc.key} label={fc.label} options={fc.options || []} value={grid.filters[fc.key] || (fc.type === "multi-select" ? [] : "")} onChange={(val) => grid.setFilter(fc.key, val)} multi={fc.type === "multi-select"} />
           ))}

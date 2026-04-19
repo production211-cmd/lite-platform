@@ -278,8 +278,8 @@ export default function Settings() {
                 <h3 className="text-sm font-bold font-heading mb-4">Platform Information</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Platform Name</label>
-                    <input
+                    <label htmlFor="settings-platform-name" className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Platform Name</label>
+                    <input id="settings-platform-name"
                       type="text"
                       value={settings.general.platformName}
                       onChange={(e) => updateSettings("general", { platformName: e.target.value })}
@@ -287,8 +287,8 @@ export default function Settings() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Support Email</label>
-                    <input
+                    <label htmlFor="settings-support-email" className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Support Email</label>
+                    <input id="settings-support-email"
                       type="email"
                       value={settings.general.supportEmail}
                       onChange={(e) => updateSettings("general", { supportEmail: e.target.value })}
@@ -297,8 +297,8 @@ export default function Settings() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Default Currency</label>
-                      <select
+                      <label htmlFor="settings-currency" className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Default Currency</label>
+                      <select id="settings-currency"
                         value={settings.general.defaultCurrency}
                         onChange={(e) => updateSettings("general", { defaultCurrency: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body bg-white"
@@ -309,8 +309,8 @@ export default function Settings() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Timezone</label>
-                      <select
+                      <label htmlFor="settings-timezone" className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Timezone</label>
+                      <select id="settings-timezone"
                         value={settings.general.timezone}
                         onChange={(e) => updateSettings("general", { timezone: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body bg-white"
@@ -322,8 +322,8 @@ export default function Settings() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Default Commission Rate (%)</label>
-                    <input
+                    <label htmlFor="settings-commission" className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Default Commission Rate (%)</label>
+                    <input id="settings-commission"
                       type="number"
                       value={settings.general.commissionRate}
                       onChange={(e) => updateSettings("general", { commissionRate: parseFloat(e.target.value) || 0 })}
@@ -397,10 +397,11 @@ export default function Settings() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Primary Color</label>
+                  <label htmlFor="settings-primary-color" className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Primary Color</label>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg border border-gray-200" style={{ backgroundColor: settings.branding.primaryColor }} />
                     <input
+                      id="settings-primary-color"
                       type="text"
                       value={settings.branding.primaryColor}
                       onChange={(e) => updateSettings("branding", { primaryColor: e.target.value })}
@@ -409,10 +410,11 @@ export default function Settings() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Accent Color</label>
+                  <label htmlFor="settings-accent-color" className="block text-xs font-semibold font-body text-gray-500 mb-1.5">Accent Color</label>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg border border-gray-200" style={{ backgroundColor: settings.branding.accentColor }} />
                     <input
+                      id="settings-accent-color"
                       type="text"
                       value={settings.branding.accentColor}
                       onChange={(e) => updateSettings("branding", { accentColor: e.target.value })}

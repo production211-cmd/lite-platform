@@ -11,7 +11,9 @@ export async function financeRoutes(app: FastifyInstance) {
     if (vendorId) where.vendorId = vendorId;
     if (status) where.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const skip = (pageNum - 1) * limitNum;
 
     // Payout has RLS
     const { payouts, total } = await withRls(prisma, request, async (tx) => {
@@ -19,7 +21,7 @@ export async function financeRoutes(app: FastifyInstance) {
         tx.payout.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take: limitNum,
           include: {
             vendor: { select: { id: true, name: true, currency: true } },
             items: true,
@@ -60,7 +62,9 @@ export async function financeRoutes(app: FastifyInstance) {
     if (vendorId) where.vendorId = vendorId;
     if (status) where.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const skip = (pageNum - 1) * limitNum;
 
     // Settlement has RLS
     const { settlements, total } = await withRls(prisma, request, async (tx) => {
@@ -68,7 +72,7 @@ export async function financeRoutes(app: FastifyInstance) {
         tx.settlement.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take: limitNum,
           include: {
             vendor: { select: { id: true, name: true, currency: true } },
             vendorOrder: { select: { id: true, orderId: true, subtotal: true } },
@@ -112,7 +116,9 @@ export async function financeRoutes(app: FastifyInstance) {
     if (vendorId) where.vendorId = vendorId;
     if (type) where.type = type;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const skip = (pageNum - 1) * limitNum;
 
     // Deduction has RLS
     const { deductions, total } = await withRls(prisma, request, async (tx) => {
@@ -120,7 +126,7 @@ export async function financeRoutes(app: FastifyInstance) {
         tx.deduction.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take: limitNum,
           include: { vendor: { select: { id: true, name: true } } },
           orderBy: { createdAt: "desc" },
         }),
