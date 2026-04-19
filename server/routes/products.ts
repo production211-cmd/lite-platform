@@ -172,6 +172,44 @@ export async function productRoutes(app: FastifyInstance) {
     return product;
   });
 
+  // POST /api/products/bulk-approve — Approve multiple products at once
+  app.post("/bulk-approve", async (request, reply) => {
+    const { ids } = request.body as { ids?: string[] };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return reply.status(400).send({ error: "ids array is required" });
+    }
+    if (ids.length > 200) {
+      return reply.status(400).send({ error: "Maximum 200 products per bulk action" });
+    }
+
+    return withRls(prisma, request, async (tx) => {
+      const result = await tx.product.updateMany({
+        where: { id: { in: ids }, status: { in: ["PENDING_REVIEW", "NEEDS_REVIEW"] } },
+        data: { status: "APPROVED" },
+      });
+      return { success: true, approved: result.count };
+    });
+  });
+
+  // POST /api/products/bulk-reject — Reject multiple products at once
+  app.post("/bulk-reject", async (request, reply) => {
+    const { ids, reason } = request.body as { ids?: string[]; reason?: string };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return reply.status(400).send({ error: "ids array is required" });
+    }
+    if (ids.length > 200) {
+      return reply.status(400).send({ error: "Maximum 200 products per bulk action" });
+    }
+
+    return withRls(prisma, request, async (tx) => {
+      const result = await tx.product.updateMany({
+        where: { id: { in: ids }, status: { in: ["PENDING_REVIEW", "NEEDS_REVIEW"] } },
+        data: { status: "REJECTED" },
+      });
+      return { success: true, rejected: result.count };
+    });
+  });
+
   // GET /api/products/categories
   app.get("/categories", async (request) => {
     const categories = await withRls(prisma, request, async (tx) => {

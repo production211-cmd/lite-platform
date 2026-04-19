@@ -16,6 +16,7 @@ import PortalOrders from "@/pages/vendor/PortalOrders";
 import VendorProducts from "@/pages/vendor/VendorProducts";
 import VendorFinance from "@/pages/vendor/VendorFinance";
 import { LogOut, Package, ShoppingCart, DollarSign, HelpCircle } from "lucide-react";
+import { withErrorBoundary } from "@/components/RouteErrorBoundary";
 
 // ============================================================
 // Minimal Top Bar (no sidebar toggle, no search)
@@ -147,10 +148,10 @@ export function VendorPortalShell() {
       <PortalTopBar />
       <main className="flex-1">
         <Switch>
-          <Route path="/vendor/portal" component={PortalHome} />
-          <Route path="/vendor/portal/orders" component={PortalOrders} />
-          <Route path="/vendor/portal/products" component={VendorProducts} />
-          <Route path="/vendor/portal/payouts" component={VendorFinance} />
+          <Route path="/vendor/portal" component={withErrorBoundary(PortalHome, "Portal Home")} />
+          <Route path="/vendor/portal/orders" component={withErrorBoundary(PortalOrders, "Portal Orders")} />
+          <Route path="/vendor/portal/products" component={withErrorBoundary(VendorProducts, "Portal Products")} />
+          <Route path="/vendor/portal/payouts" component={withErrorBoundary(VendorFinance, "Portal Finance")} />
           <Route path="/vendor/portal/help">{() => <PortalPlaceholder title="Help & Support" />}</Route>
           <Route>
             <div className="flex items-center justify-center h-[60vh]">

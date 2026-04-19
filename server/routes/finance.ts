@@ -235,9 +235,27 @@ export async function financeRoutes(app: FastifyInstance) {
         })
       );
 
-      return results;
+       return results;
     });
-
     return balances;
+  });
+
+  // POST /api/finance/settlements/bulk-process — Process multiple settlements at once
+  app.post("/settlements/bulk-process", async (request, reply) => {
+    const { ids } = request.body as { ids?: string[] };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return reply.status(400).send({ error: "ids array is required" });
+    }
+    if (ids.length > 100) {
+      return reply.status(400).send({ error: "Maximum 100 settlements per bulk action" });
+    }
+
+    return withRls(prisma, request, async (tx) => {
+      const result = await tx.settlement.updateMany({
+        where: { id: { in: ids }, status: "PENDING" },
+        data: { status: "PROCESSING" },
+      });
+      return { success: true, processed: result.count };
+    });
   });
 }

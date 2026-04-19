@@ -424,6 +424,56 @@ class ApiClient {
   createUser(data: { email: string; firstName: string; lastName: string; role: string; password: string }) {
     return this.request<any>("/users", { method: "POST", body: JSON.stringify(data) });
   }
+
+  // ============================================================
+  // Notifications
+  // ============================================================
+  getNotifications(params?: Record<string, string>) {
+    const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+    return this.request<any>(`/notifications${qs}`);
+  }
+  getUnreadCount() {
+    return this.request<any>("/notifications/unread-count");
+  }
+  markNotificationRead(id: string) {
+    return this.request<any>(`/notifications/${id}/read`, { method: "PUT", body: "{}" });
+  }
+  markAllNotificationsRead() {
+    return this.request<any>("/notifications/read-all", { method: "PUT", body: "{}" });
+  }
+  dismissNotification(id: string) {
+    return this.request<any>(`/notifications/${id}`, { method: "DELETE" });
+  }
+
+  // ============================================================
+  // Platform Settings
+  // ============================================================
+  getSettings(category?: string) {
+    const qs = category ? `?category=${category}` : "";
+    return this.request<any>(`/settings${qs}`);
+  }
+  getSetting(key: string) {
+    return this.request<any>(`/settings/${key}`);
+  }
+  updateSetting(key: string, data: { value: string; category?: string; label?: string }) {
+    return this.request<any>(`/settings/${key}`, { method: "PUT", body: JSON.stringify(data) });
+  }
+  updateSettingsBulk(settings: { key: string; value: string; category?: string }[]) {
+    return this.request<any>("/settings/bulk", { method: "PUT", body: JSON.stringify({ settings }) });
+  }
+
+  // ============================================================
+  // Bulk Actions
+  // ============================================================
+  bulkApproveProducts(ids: string[]) {
+    return this.request<any>("/products/bulk-approve", { method: "POST", body: JSON.stringify({ ids }) });
+  }
+  bulkRejectProducts(ids: string[], reason?: string) {
+    return this.request<any>("/products/bulk-reject", { method: "POST", body: JSON.stringify({ ids, reason }) });
+  }
+  bulkProcessSettlements(ids: string[]) {
+    return this.request<any>("/finance/settlements/bulk-process", { method: "POST", body: JSON.stringify({ ids }) });
+  }
 }
 
 export const api = new ApiClient();

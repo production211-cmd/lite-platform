@@ -232,6 +232,7 @@ model User {
   assignedMessages MessageThread[]  @relation("AssignedAgent")
   refreshTokens    RefreshToken[]
   vendorAccess     VendorAccess?
+  notifications    Notification[]
 
   @@index([email])
   @@index([vendorId])
@@ -992,4 +993,58 @@ model SyncCursorLog {
   @@unique([vendorId, integrationType, cursorType])
   @@index([vendorId])
   @@index([createdAt])
+}
+
+// ─── Notifications ───────────────────────────────────────────────
+enum NotificationType {
+  ORDER
+  SHIPMENT
+  RETURN
+  VENDOR
+  PRODUCT
+  FINANCE
+  SYSTEM
+  ALERT
+}
+
+enum NotificationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Notification {
+  id          String               @id @default(cuid())
+  userId      String
+  type        NotificationType
+  priority    NotificationPriority @default(MEDIUM)
+  title       String
+  message     String
+  isRead      Boolean              @default(false)
+  actionUrl   String?
+  actionLabel String?
+  metadata    Json?
+  createdAt   DateTime             @default(now())
+
+  user        User                 @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+// ─── Platform Settings ───────────────────────────────────────────
+model PlatformSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String   @db.Text
+  category    String   @default("general")
+  label       String?
+  description String?
+  updatedBy   String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([category])
 }

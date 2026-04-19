@@ -11,6 +11,7 @@ import { Route, Switch, useLocation, Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 import { TopBar } from "@/components/TopBar";
+import { withErrorBoundary } from "@/components/RouteErrorBoundary";
 import VendorDashboard from "@/pages/vendor/VendorDashboard";
 import VendorProducts from "@/pages/vendor/VendorProducts";
 import VendorOrders from "@/pages/vendor/VendorOrders";
@@ -257,22 +258,22 @@ function VendorContent() {
       >
         <main className="flex-1 overflow-y-auto">
           <Switch>
-            <Route path="/vendor" component={VendorDashboard} />
-            <Route path="/vendor/products" component={VendorProducts} />
-            <Route path="/vendor/products/new" component={ProductSubmission} />
-            <Route path="/vendor/orders" component={VendorOrders} />
+            <Route path="/vendor" component={withErrorBoundary(VendorDashboard, "Vendor Dashboard")} />
+            <Route path="/vendor/products" component={withErrorBoundary(VendorProducts, "Vendor Products")} />
+            <Route path="/vendor/products/new" component={withErrorBoundary(ProductSubmission, "Product Submission")} />
+            <Route path="/vendor/orders" component={withErrorBoundary(VendorOrders, "Vendor Orders")} />
             <Route path="/vendor/orders/pending">{() => {
               // Filter to pending only via VendorOrders with preset filter
               return <VendorOrders />;
             }}</Route>
             <Route path="/vendor/orders/returns">{() => <VendorPlaceholder title="Returns" />}</Route>
-            <Route path="/vendor/orders/:id" component={OrderFulfillment} />
-            <Route path="/vendor/shipments" component={VendorShipments} />
+            <Route path="/vendor/orders/:id" component={withErrorBoundary(OrderFulfillment, "Order Fulfillment")} />
+            <Route path="/vendor/shipments" component={withErrorBoundary(VendorShipments, "Vendor Shipments")} />
             <Route path="/vendor/messages">{() => <VendorPlaceholder title="Messages" />}</Route>
-            <Route path="/vendor/finance" component={VendorFinance} />
-            <Route path="/vendor/finance/payouts" component={PayoutHistory} />
+            <Route path="/vendor/finance" component={withErrorBoundary(VendorFinance, "Vendor Finance")} />
+            <Route path="/vendor/finance/payouts" component={withErrorBoundary(PayoutHistory, "Payout History")} />
             <Route path="/vendor/analytics">{() => <VendorPlaceholder title="Analytics" />}</Route>
-            <Route path="/vendor/settings" component={VendorSettings} />
+            <Route path="/vendor/settings" component={withErrorBoundary(VendorSettings, "Vendor Settings")} />
             <Route>
               <div className="flex items-center justify-center h-[60vh]">
                 <p className="text-gray-500">Page not found</p>

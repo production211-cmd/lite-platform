@@ -35,6 +35,8 @@ import { analyticsRoutes } from "./routes/analytics.js";
 import { queueRoutes } from "./routes/queues.js";
 import { activityRoutes } from "./routes/activity.js";
 import { userRoutes } from "./routes/users.js";
+import { notificationRoutes } from "./routes/notifications.js";
+import { settingsRoutes } from "./routes/settings.js";
 import { startAllWorkers, stopAllWorkers } from "./workers/index.js";
 import { closeAllQueues } from "./queues/index.js";
 
@@ -145,6 +147,8 @@ await app.register(analyticsRoutes, { prefix: "/api/analytics" });
 await app.register(queueRoutes, { prefix: "/api/queues" });
 await app.register(activityRoutes, { prefix: "/api/activity" });
 await app.register(userRoutes, { prefix: "/api/users" });
+await app.register(notificationRoutes, { prefix: "/api/notifications" });
+await app.register(settingsRoutes, { prefix: "/api/settings" });
 
 // ============================================================
 // Global Error Handler
