@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+/**
+ * R7 Audit Fixes Applied:
+ *  - 3C: Debounced search input (300ms) to prevent double-fetch
+ *  - 4A: Modal role="dialog", aria-modal, aria-labelledby, focus trap
+ *  - 4B: Reply input + search input have aria-label
+ */
+import { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import {
@@ -37,11 +43,50 @@ interface Stats {
   slaBreach: number;
 }
 
+/* ── Focus-trap helper ── */
+function useFocusTrap(isOpen: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    triggerRef.current = document.activeElement as HTMLElement;
+    const el = ref.current;
+    if (!el) return;
+    const focusable = el.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length) focusable[0].focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Tab" && focusable.length) {
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    el.addEventListener("keydown", handleKeyDown);
+    return () => {
+      el.removeEventListener("keydown", handleKeyDown);
+      triggerRef.current?.focus();
+    };
+  }, [isOpen]);
+
+  return ref;
+}
+
 export default function Issues() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, open: 0, pending: 0, resolved: 0, urgent: 0, slaBreach: 0 });
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState(""); // R7-3C: raw input
+  const [search, setSearch] = useState(""); // R7-3C: debounced value
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
@@ -51,6 +96,20 @@ export default function Issues() {
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const limit = 20;
+
+  // R7-3C: Debounce search with 300ms timer
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearch(value);
+      setPage(1);
+    }, 300);
+  };
+
+  // R7-4A: Focus trap for modal
+  const modalRef = useFocusTrap(!!selectedThread);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -194,23 +253,33 @@ export default function Issues() {
       <div className="flex items-center gap-3 flex-wrap">
         <div className="search-bar flex-1 max-w-sm">
           <Search size={14} className="text-gray-400 flex-shrink-0" />
-          <input type="text" placeholder="Search by subject, vendor..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="text-xs" />
+          <input
+            type="text"
+            placeholder="Search by subject, vendor..."
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="text-xs"
+            aria-label="Search issues by subject or vendor"
+          />
         </div>
-        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-body bg-white">
+        <label className="sr-only" htmlFor="issues-status-filter">Filter by status</label>
+        <select id="issues-status-filter" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-body bg-white">
           <option value="all">All Statuses</option>
           <option value="OPEN">Open</option>
           <option value="PENDING">Pending</option>
           <option value="RESOLVED">Resolved</option>
           <option value="CLOSED">Closed</option>
         </select>
-        <select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }} className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-body bg-white">
+        <label className="sr-only" htmlFor="issues-priority-filter">Filter by priority</label>
+        <select id="issues-priority-filter" value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }} className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-body bg-white">
           <option value="all">All Priorities</option>
           <option value="LOW">Low</option>
           <option value="NORMAL">Normal</option>
           <option value="HIGH">High</option>
           <option value="URGENT">Urgent</option>
         </select>
-        <select value={departmentFilter} onChange={(e) => { setDepartmentFilter(e.target.value); setPage(1); }} className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-body bg-white">
+        <label className="sr-only" htmlFor="issues-dept-filter">Filter by department</label>
+        <select id="issues-dept-filter" value={departmentFilter} onChange={(e) => { setDepartmentFilter(e.target.value); setPage(1); }} className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-body bg-white">
           <option value="all">All Departments</option>
           <option value="CATALOG_BUYER">Catalog / Buyer</option>
           <option value="RMS">RMS</option>
@@ -238,7 +307,7 @@ export default function Issues() {
                   <th>Assigned</th>
                   <th>Messages</th>
                   <th>Updated</th>
-                  <th className="w-20"></th>
+                  <th className="w-20"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -268,7 +337,7 @@ export default function Issues() {
                     </td>
                     <td className="text-xs font-body text-gray-500 text-center">{thread._count?.messages || 0}</td>
                     <td className="text-xs font-body text-gray-400">{formatDate(thread.updatedAt)}</td>
-                    <td><button className="btn-view"><Eye size={12} /> View</button></td>
+                    <td><button className="btn-view" aria-label={`View thread: ${thread.subject}`}><Eye size={12} /> View</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -287,21 +356,32 @@ export default function Issues() {
             Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total} threads
           </p>
           <div className="flex items-center gap-1">
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40" aria-label="Previous page">
               <ChevronLeft size={14} />
             </button>
             <span className="px-3 py-1 text-xs font-body">Page {page} of {totalPages}</span>
-            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40">
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40" aria-label="Next page">
               <ChevronRight size={14} />
             </button>
           </div>
         </div>
       )}
 
-      {/* Thread Detail Modal */}
+      {/* Thread Detail Modal — R7-4A: ARIA + focus trap */}
       {selectedThread && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setSelectedThread(null)}>
-          <div className="bg-white rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+          onClick={() => setSelectedThread(null)}
+          role="presentation"
+        >
+          <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="thread-detail-title"
+            className="bg-white rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="p-5 border-b border-gray-100">
               <div className="flex items-start justify-between">
@@ -313,13 +393,13 @@ export default function Issues() {
                       <span className="text-[10px] font-bold text-red-600 flex items-center gap-0.5"><AlertTriangle size={10} /> SLA Breached</span>
                     )}
                   </div>
-                  <h3 className="text-sm font-bold font-heading truncate">{selectedThread.subject}</h3>
+                  <h3 id="thread-detail-title" className="text-sm font-bold font-heading truncate">{selectedThread.subject}</h3>
                   <p className="text-[11px] text-gray-500 font-body mt-0.5">
-                    {selectedThread.vendor?.name} &middot; {departmentLabels[selectedThread.department] || selectedThread.department}
+                    {selectedThread.vendor?.name || "—"} &middot; {departmentLabels[selectedThread.department] || selectedThread.department}
                     {selectedThread.assignedTo && ` · Assigned to ${selectedThread.assignedTo.firstName} ${selectedThread.assignedTo.lastName}`}
                   </p>
                 </div>
-                <button onClick={() => setSelectedThread(null)} className="p-1 hover:bg-gray-100 rounded-lg ml-2 flex-shrink-0">
+                <button onClick={() => setSelectedThread(null)} className="p-1 hover:bg-gray-100 rounded-lg ml-2 flex-shrink-0" aria-label="Close thread detail">
                   <XCircle size={18} className="text-gray-400" />
                 </button>
               </div>
@@ -345,7 +425,7 @@ export default function Issues() {
 
             {/* Reply + Actions */}
             <div className="p-4 border-t border-gray-100 space-y-3">
-              {/* Reply input */}
+              {/* Reply input — R7-4B: aria-label */}
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -354,6 +434,7 @@ export default function Issues() {
                   onChange={(e) => setReplyText(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSendReply()}
                   className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs font-body focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  aria-label="Type a reply message"
                 />
                 <button
                   onClick={handleSendReply}
