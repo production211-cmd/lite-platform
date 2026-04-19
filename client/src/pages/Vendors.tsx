@@ -230,27 +230,36 @@ export default function Vendors() {
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="quick-stat card-hover">
-          <p className="stat-number">{normalized.length}</p>
-          <p className="stat-label">Total Vendors</p>
+      {/* Vendor Summary — matches reference */}
+      <div className="bg-white rounded-lg border border-gray-200 p-5">
+        <h3 className="section-heading mb-4">Vendor Summary</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="quick-stat card-hover">
+            <p className="stat-number">{normalized.length}</p>
+            <p className="stat-label">Total Vendors</p>
+          </div>
+          <div className="quick-stat card-hover">
+            <p className="stat-number text-green-600">{normalized.filter((v) => v.isActive).length}</p>
+            <p className="stat-label">Active</p>
+          </div>
+          <div className="quick-stat card-hover">
+            <p className="stat-number text-yellow-600">0</p>
+            <p className="stat-label">Pending Approval</p>
+          </div>
+          <div className="quick-stat card-hover">
+            <p className="stat-number text-red-600">0</p>
+            <p className="stat-label">Suspended</p>
+          </div>
+          <div className="quick-stat card-hover">
+            <p className="stat-number text-red-600">0</p>
+            <p className="stat-label">At Risk</p>
+          </div>
         </div>
-        <div className="quick-stat card-hover">
-          <p className="stat-number">{normalized.filter((v) => v.location === "DOMESTIC_US").length}</p>
-          <p className="stat-label">Domestic (US)</p>
-        </div>
-        <div className="quick-stat card-hover">
-          <p className="stat-number">{normalized.filter((v) => v.location === "INTERNATIONAL").length}</p>
-          <p className="stat-label">International</p>
-        </div>
-        <div className="quick-stat card-hover">
-          <p className="stat-number">{tabCounts.MARKETPLACE} / {tabCounts.WHOLESALE}</p>
-          <p className="stat-label">Marketplace / Wholesale</p>
-        </div>
+        <p className="text-sm text-gray-500 font-body mt-3">By Type: <span className="text-blue-600 font-semibold">{tabCounts.MARKETPLACE} Marketplace</span> | <span className="text-purple-600 font-semibold">{tabCounts.WHOLESALE} Wholesale</span></p>
       </div>
 
-      {/* Search + Filters + View Toggle */}
+      {/* Filters — matches reference */}
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider font-body">Filters:</p>
       <div className="flex items-center gap-3 flex-wrap">
         <SearchBar
           value={grid.search}
