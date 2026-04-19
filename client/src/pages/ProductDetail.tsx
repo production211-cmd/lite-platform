@@ -121,6 +121,55 @@ interface Product {
 }
 
 /* ------------------------------------------------------------------ */
+/* Helpers (audit R5)                                                  */
+/* ------------------------------------------------------------------ */
+
+/** Parse a number input value, preserving 0 as valid (R5-2B fix) */
+function parseNullableNumber(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Strip undefined keys from an object before sending as PATCH (R5-2A fix) */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined)
+  ) as Partial<T>;
+}
+
+/** CSS-safe color map for luxury merchandise color names (R5-3C fix) */
+const CSS_COLOR_MAP: Record<string, string> = {
+  black: "#000000", white: "#ffffff", red: "#dc2626", blue: "#2563eb",
+  navy: "#1e3a5f", green: "#16a34a", brown: "#92400e", beige: "#d4c5a9",
+  cream: "#fffdd0", grey: "#6b7280", gray: "#6b7280", pink: "#ec4899",
+  orange: "#ea580c", yellow: "#eab308", purple: "#9333ea", gold: "#d4a017",
+  silver: "#c0c0c0", tan: "#d2b48c", ivory: "#fffff0", burgundy: "#800020",
+  olive: "#808000", coral: "#ff7f50", teal: "#008080", maroon: "#800000",
+  khaki: "#c3b091", camel: "#c19a6b",
+};
+
+function getSwatchColor(colorName: string | null): string | null {
+  if (!colorName) return null;
+  const lower = colorName.toLowerCase().trim();
+  if (CSS_COLOR_MAP[lower]) return CSS_COLOR_MAP[lower];
+  // Try first word for compound names like "Navy/Gold"
+  const firstWord = lower.split(/[\/\s,&-]/)[0].trim();
+  if (CSS_COLOR_MAP[firstWord]) return CSS_COLOR_MAP[firstWord];
+  return null; // Unknown — will show text-only badge
+}
+
+/* ------------------------------------------------------------------ */
+/* Confirm state machine (R5-3A fix)                                   */
+/* ------------------------------------------------------------------ */
+
+type ConfirmState =
+  | { type: "none" }
+  | { type: "modal"; action: "approve" | "push" | "archive" }
+  | { type: "inline-reject" };
+
+/* ------------------------------------------------------------------ */
 /* Style maps                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -148,7 +197,8 @@ const RISK_STYLES: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 function ScoreBar({ label, score, maxScore = 35 }: { label: string; score: number | null; maxScore?: number }) {
-  const pct = score != null ? Math.min((score / maxScore) * 100, 100) : 0;
+  const safeScore = score == null ? null : Math.max(0, Math.min(score, maxScore));
+  const pct = safeScore != null ? Math.min((safeScore / maxScore) * 100, 100) : 0;
   const color = pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-400";
   return (
     <div className="flex items-center gap-3">
@@ -156,7 +206,7 @@ function ScoreBar({ label, score, maxScore = 35 }: { label: string; score: numbe
       <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
         <div className={cn("h-full rounded-full transition-all duration-500", color)} style={{ width: `${pct}%` }} />
       </div>
-      <span className="text-[11px] font-body font-semibold text-gray-600 w-8 text-right">{score ?? 0}</span>
+      <span className="text-[11px] font-body font-semibold text-gray-600 w-8 text-right">{safeScore ?? 0}</span>
     </div>
   );
 }
@@ -182,7 +232,7 @@ export default function ProductDetail() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState<"variants" | "pricing" | "compliance" | "seo">("variants");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState>({ type: "none" });
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<Product>>({});
   const [saveLoading, setSaveLoading] = useState(false);
@@ -218,7 +268,7 @@ export default function ProductDetail() {
       console.error(`Action ${action} failed:`, err);
     }
     setActionLoading(null);
-    setConfirmAction(null);
+    setConfirmState({ type: "none" });
   };
 
   /* ---- Edit Mode ---- */
@@ -248,7 +298,8 @@ export default function ProductDetail() {
     if (!product) return;
     setSaveLoading(true);
     try {
-      await api.updateProduct(product.id, editData);
+      const payload = stripUndefined(editData);
+      await api.updateProduct(product.id, payload);
       await fetchProduct(product.id);
       setIsEditing(false);
       setEditData({});
@@ -262,8 +313,10 @@ export default function ProductDetail() {
   const retailPrice = product?.salesPrice ?? product?.compareAtPrice ?? 0;
   const wholesalePrice = product?.retailerCost ?? product?.vendorCost ?? 0;
   const margin = useMemo(() => {
-    if (retailPrice <= 0) return 0;
-    return ((retailPrice - wholesalePrice) / retailPrice) * 100;
+    const r = Number(retailPrice);
+    const w = Number(wholesalePrice);
+    if (!Number.isFinite(r) || !Number.isFinite(w) || r <= 0) return 0;
+    return ((r - w) / r) * 100;
   }, [retailPrice, wholesalePrice]);
 
   const totalStock = useMemo(
@@ -366,14 +419,14 @@ export default function ProductDetail() {
               </button>
               {canReview && (
                 <>
-                  {confirmAction === "reject" ? (
+                  {confirmState.type === "inline-reject" ? (
                     <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                       <span className="text-xs text-red-700 font-body">Confirm reject?</span>
                       <button onClick={() => handleAction("reject")} className="px-2 py-1 bg-red-600 text-white rounded text-xs font-bold">Yes</button>
-                      <button onClick={() => setConfirmAction(null)} className="px-2 py-1 border border-red-300 text-red-600 rounded text-xs font-bold">No</button>
+                      <button onClick={() => setConfirmState({ type: "none" })} className="px-2 py-1 border border-red-300 text-red-600 rounded text-xs font-bold">No</button>
                     </div>
                   ) : (
-                    <button onClick={() => setConfirmAction("reject")} disabled={!!actionLoading} className="px-3 py-2 border border-red-200 text-red-600 rounded-lg text-xs font-semibold font-body hover:bg-red-50 flex items-center gap-1.5 disabled:opacity-50">
+                    <button onClick={() => setConfirmState({ type: "inline-reject" })} disabled={!!actionLoading} className="px-3 py-2 border border-red-200 text-red-600 rounded-lg text-xs font-semibold font-body hover:bg-red-50 flex items-center gap-1.5 disabled:opacity-50">
                       <XCircle size={12} /> Reject
                     </button>
                   )}
@@ -383,7 +436,7 @@ export default function ProductDetail() {
                 </>
               )}
               {product.status === "APPROVED" && (
-                <button onClick={() => setConfirmAction("push")} disabled={!!actionLoading} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold font-body hover:bg-blue-700 flex items-center gap-1.5 disabled:opacity-50">
+                <button onClick={() => setConfirmState({ type: "modal", action: "push" })} disabled={!!actionLoading} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold font-body hover:bg-blue-700 flex items-center gap-1.5 disabled:opacity-50">
                   {actionLoading === "push" ? "Publishing..." : <><Send size={12} /> Push to Shopify</>}
                 </button>
               )}
@@ -443,6 +496,7 @@ export default function ProductDetail() {
                       i === selectedImage ? "border-gray-900 shadow-sm" : "border-transparent opacity-60 hover:opacity-100"
                     )}
                     aria-label={`View image ${i + 1}`}
+                    aria-current={i === selectedImage ? "true" : undefined}
                   >
                     {img.url ? (
                       <img src={img.url} alt={img.altText || `Thumbnail ${i + 1}`} className="w-full h-full object-cover" />
@@ -555,15 +609,15 @@ export default function ProductDetail() {
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-[10px] text-gray-500 font-body block mb-1">Sales Price</label>
-                  <input type="number" step="0.01" value={editData.salesPrice ?? ""} onChange={(e) => setEditData((d) => ({ ...d, salesPrice: parseFloat(e.target.value) || null }))} className="w-full text-sm font-body bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900/20" />
+                  <input type="number" step="0.01" value={editData.salesPrice ?? ""} onChange={(e) => setEditData((d) => ({ ...d, salesPrice: parseNullableNumber(e.target.value) }))} className="w-full text-sm font-body bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900/20" />
                 </div>
                 <div>
                   <label className="text-[10px] text-gray-500 font-body block mb-1">Compare At Price</label>
-                  <input type="number" step="0.01" value={editData.compareAtPrice ?? ""} onChange={(e) => setEditData((d) => ({ ...d, compareAtPrice: parseFloat(e.target.value) || null }))} className="w-full text-sm font-body bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900/20" />
+                  <input type="number" step="0.01" value={editData.compareAtPrice ?? ""} onChange={(e) => setEditData((d) => ({ ...d, compareAtPrice: parseNullableNumber(e.target.value) }))} className="w-full text-sm font-body bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900/20" />
                 </div>
                 <div>
                   <label className="text-[10px] text-gray-500 font-body block mb-1">Retailer Cost</label>
-                  <input type="number" step="0.01" value={editData.retailerCost ?? ""} onChange={(e) => setEditData((d) => ({ ...d, retailerCost: parseFloat(e.target.value) || null }))} className="w-full text-sm font-body bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900/20" />
+                  <input type="number" step="0.01" value={editData.retailerCost ?? ""} onChange={(e) => setEditData((d) => ({ ...d, retailerCost: parseNullableNumber(e.target.value) }))} className="w-full text-sm font-body bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900/20" />
                 </div>
               </div>
             </div>
@@ -631,8 +685,10 @@ export default function ProductDetail() {
               ]).map((tab) => (
                 <button
                   key={tab.key}
+                  id={`tab-${tab.key}`}
                   role="tab"
                   aria-selected={activeTab === tab.key}
+                  aria-controls={`tabpanel-${tab.key}`}
                   onClick={() => setActiveTab(tab.key)}
                   className={cn(
                     "px-4 py-3 text-xs font-semibold font-body flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap",
@@ -649,7 +705,7 @@ export default function ProductDetail() {
 
             {/* Variants Tab */}
             {activeTab === "variants" && (
-              <div role="tabpanel" aria-label="Variants">
+              <div id="tabpanel-variants" role="tabpanel" aria-labelledby="tab-variants">
                 {product.variants.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="data-table">
@@ -672,7 +728,11 @@ export default function ProductDetail() {
                             <td className="text-xs font-body">
                               {v.color ? (
                                 <span className="flex items-center gap-1.5">
-                                  <span className="w-3 h-3 rounded-full border border-gray-200" style={{ backgroundColor: v.color.toLowerCase() }} />
+                                  {getSwatchColor(v.color) ? (
+                                    <span className="w-3 h-3 rounded-full border border-gray-200" style={{ backgroundColor: getSwatchColor(v.color)! }} />
+                                  ) : (
+                                    <span className="w-3 h-3 rounded-full border border-gray-200 bg-gradient-to-br from-gray-200 to-gray-400" title={v.color} />
+                                  )}
                                   {v.color}
                                 </span>
                               ) : "—"}
@@ -705,7 +765,7 @@ export default function ProductDetail() {
 
             {/* Price History Tab */}
             {activeTab === "pricing" && (
-              <div role="tabpanel" aria-label="Price History">
+              <div id="tabpanel-pricing" role="tabpanel" aria-labelledby="tab-pricing">
                 {product.priceHistory.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="data-table">
@@ -748,7 +808,7 @@ export default function ProductDetail() {
 
             {/* Compliance Tab */}
             {activeTab === "compliance" && (
-              <div role="tabpanel" aria-label="Compliance" className="p-4 space-y-3">
+              <div id="tabpanel-compliance" role="tabpanel" aria-labelledby="tab-compliance" className="p-4 space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <InfoRow label="HS Code" value={product.hsCode} mono />
@@ -798,7 +858,7 @@ export default function ProductDetail() {
 
             {/* SEO Tab */}
             {activeTab === "seo" && (
-              <div role="tabpanel" aria-label="SEO" className="p-4 space-y-3">
+              <div id="tabpanel-seo" role="tabpanel" aria-labelledby="tab-seo" className="p-4 space-y-3">
                 <div>
                   <label className="text-[10px] font-body text-gray-400 block mb-1">Meta Title</label>
                   {isEditing ? (
@@ -849,16 +909,16 @@ export default function ProductDetail() {
       </div>
 
       {/* Confirm Dialog Overlay (for push action) */}
-      {confirmAction && confirmAction !== "reject" && (
+      {confirmState.type === "modal" && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-label="Confirm action">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl">
             <h3 className="text-sm font-bold font-heading mb-2">Confirm Action</h3>
             <p className="text-xs text-gray-500 font-body mb-4">
-              Are you sure you want to {confirmAction} this product?
+              Are you sure you want to {confirmState.action} this product?
             </p>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setConfirmAction(null)} className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold">Cancel</button>
-              <button onClick={() => handleAction(confirmAction)} className="px-3 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold">Confirm</button>
+              <button onClick={() => setConfirmState({ type: "none" })} className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold">Cancel</button>
+              <button onClick={() => handleAction(confirmState.action)} className="px-3 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold">Confirm</button>
             </div>
           </div>
         </div>
