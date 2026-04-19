@@ -11,7 +11,7 @@ import { Route, Switch } from "wouter";
 import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
-import { withErrorBoundary } from "@/components/RouteErrorBoundary";
+import { withErrorBoundary, RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import Dashboard from "@/pages/Dashboard";
 import Vendors from "@/pages/Vendors";
 import VendorDetail from "@/pages/VendorDetail";
@@ -98,7 +98,7 @@ function AdminContent() {
             {/* Vendors */}
             <Route path="/vendors" component={SafeVendors} />
             <Route path="/vendors/onboard" component={SafeVendorOnboarding} />
-            <Route path="/vendors/performance">{() => <div className="p-8"><h2 className="font-heading small-caps text-2xl">Vendor Performance</h2><p className="text-gray-500 mt-2">Coming soon</p></div>}</Route>
+            <Route path="/vendors/performance">{() => <RouteErrorBoundary pageName="Vendor Performance"><div className="p-8"><h2 className="font-heading small-caps text-2xl">Vendor Performance</h2><p className="text-gray-500 mt-2">Coming soon</p></div></RouteErrorBoundary>}</Route>
             <Route path="/vendors/:id" component={SafeVendorDetail} />
             {/* Products */}
             <Route path="/products" component={SafeProducts} />
@@ -140,9 +140,11 @@ function AdminContent() {
             <Route path="/admin/queues" component={SafeQueueMonitor} />
             {/* 404 */}
             <Route>
-              <div className="flex items-center justify-center h-[60vh]">
-                <p className="text-gray-500">Page not found</p>
-              </div>
+              <RouteErrorBoundary pageName="Not Found">
+                <div className="flex items-center justify-center h-[60vh]">
+                  <p className="text-gray-500">Page not found</p>
+                </div>
+              </RouteErrorBoundary>
             </Route>
           </Switch>
         </main>

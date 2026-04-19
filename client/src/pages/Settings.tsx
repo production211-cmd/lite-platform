@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   Settings as SettingsIcon, Store, Truck, CreditCard, Bell,
@@ -106,6 +107,47 @@ function saveSettings(settings: PlatformSettings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
+/** Attempt to load settings from API, merge with defaults */
+async function loadSettingsFromApi(): Promise<PlatformSettings | null> {
+  try {
+    const data = await api.getSettings();
+    if (data.settings && data.settings.length > 0) {
+      const result = { ...DEFAULT_SETTINGS };
+      for (const s of data.settings) {
+        try {
+          const parsed = JSON.parse(s.value);
+          if (s.category && (result as any)[s.category]) {
+            (result as any)[s.category] = { ...(result as any)[s.category], ...parsed };
+          }
+        } catch {
+          // Single value — try to place by key
+          const parts = s.key.split(".");
+          if (parts.length === 2 && (result as any)[parts[0]]) {
+            (result as any)[parts[0]][parts[1]] = s.value;
+          }
+        }
+      }
+      return result;
+    }
+  } catch { /* API unavailable — fall back to localStorage */ }
+  return null;
+}
+
+/** Persist settings to API (best-effort) + localStorage */
+async function saveSettingsToApi(settings: PlatformSettings) {
+  // Always save to localStorage as fallback
+  saveSettings(settings);
+  // Best-effort API persist
+  try {
+    const entries = Object.entries(settings).map(([category, data]) => ({
+      key: category,
+      value: JSON.stringify(data),
+      category,
+    }));
+    await api.updateSettingsBulk(entries);
+  } catch { /* API unavailable — localStorage already saved */ }
+}
+
 interface SettingsGroup {
   label: string;
   sections: { key: string; label: string; icon: any; adminOnly?: boolean }[];
@@ -116,6 +158,13 @@ export default function Settings() {
   const [activeSection, setActiveSection] = useState("general");
   const [settings, setSettings] = useState<PlatformSettings>(loadSettings);
   const [saving, setSaving] = useState(false);
+
+  // Attempt to load from API on mount
+  useEffect(() => {
+    loadSettingsFromApi().then((apiSettings) => {
+      if (apiSettings) setSettings(apiSettings);
+    });
+  }, []);
 
   const isValidHex = (v: string) => /^#[0-9a-fA-F]{0,6}$/.test(v);
 
@@ -131,14 +180,16 @@ export default function Settings() {
     });
   }, []);
 
-  const handleSave = useCallback((section: string) => {
+  const handleSave = useCallback(async (section: string) => {
     setSaving(true);
-    // Simulate brief save delay
-    setTimeout(() => {
-      saveSettings(settings);
-      setSaving(false);
+    try {
+      await saveSettingsToApi(settings);
       showToast(`${section} settings saved successfully`);
-    }, 400);
+    } catch {
+      saveSettings(settings);
+      showToast(`${section} settings saved locally`, "error");
+    }
+    setSaving(false);
   }, [settings]);
 
   const groups: SettingsGroup[] = [

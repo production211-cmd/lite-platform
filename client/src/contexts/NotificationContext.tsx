@@ -2,9 +2,11 @@
  * NotificationContext — Global Notification State
  * =================================================
  * Manages notification list, unread count, mark-as-read,
- * and toast triggers for real-time alerts.
+ * and toast triggers. Wired to /api/notifications backend
+ * with graceful fallback to demo data when API unavailable.
  */
-import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
+import { api } from "@/lib/api";
 
 export type NotificationType = "order" | "shipment" | "return" | "vendor" | "product" | "finance" | "system" | "alert";
 export type NotificationPriority = "low" | "medium" | "high" | "critical";
@@ -30,11 +32,13 @@ interface NotificationContextType {
   dismissNotification: (id: string) => void;
   addNotification: (n: Omit<Notification, "id" | "timestamp" | "read">) => void;
   clearAll: () => void;
+  loading: boolean;
+  refresh: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | null>(null);
 
-// Demo notifications
+// Demo notifications — used as fallback when API is unavailable
 const DEMO_NOTIFICATIONS: Notification[] = [
   {
     id: "n1", type: "order", priority: "high", title: "New Order Received",
@@ -96,22 +100,69 @@ const DEMO_NOTIFICATIONS: Notification[] = [
   },
 ];
 
+/** Map API response fields to our Notification interface */
+function mapApiNotification(n: any): Notification {
+  return {
+    id: n.id,
+    type: (n.type || "system").toLowerCase(),
+    priority: (n.priority || "low").toLowerCase(),
+    title: n.title || "",
+    message: n.message || "",
+    timestamp: n.createdAt || n.timestamp || new Date().toISOString(),
+    read: n.isRead ?? n.read ?? false,
+    actionUrl: n.actionUrl,
+    actionLabel: n.actionLabel,
+    metadata: n.metadata,
+  };
+}
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>(DEMO_NOTIFICATIONS);
+  const [loading, setLoading] = useState(false);
+  const [useApi, setUseApi] = useState(true);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!useApi) return;
+    setLoading(true);
+    try {
+      const data = await api.getNotifications({ page: "1", limit: "100" });
+      if (data.notifications && data.notifications.length > 0) {
+        setNotifications(data.notifications.map(mapApiNotification));
+      }
+      // If API returns empty, keep demo data for better UX
+    } catch {
+      // API not available — fall back to demo data silently
+      setUseApi(false);
+    }
+    setLoading(false);
+  }, [useApi]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
-  const markAsRead = useCallback((id: string) => {
+  const markAsRead = useCallback(async (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  }, []);
+    if (useApi) {
+      try { await api.markNotificationRead(id); } catch { /* optimistic update already applied */ }
+    }
+  }, [useApi]);
 
-  const markAllAsRead = useCallback(() => {
+  const markAllAsRead = useCallback(async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, []);
+    if (useApi) {
+      try { await api.markAllNotificationsRead(); } catch { /* optimistic update already applied */ }
+    }
+  }, [useApi]);
 
-  const dismissNotification = useCallback((id: string) => {
+  const dismissNotification = useCallback(async (id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
+    if (useApi) {
+      try { await api.dismissNotification(id); } catch { /* optimistic update already applied */ }
+    }
+  }, [useApi]);
 
   const addNotification = useCallback((n: Omit<Notification, "id" | "timestamp" | "read">) => {
     const newNotif: Notification = {
@@ -128,8 +179,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(() => ({
-    notifications, unreadCount, markAsRead, markAllAsRead, dismissNotification, addNotification, clearAll,
-  }), [notifications, unreadCount, markAsRead, markAllAsRead, dismissNotification, addNotification, clearAll]);
+    notifications, unreadCount, markAsRead, markAllAsRead, dismissNotification,
+    addNotification, clearAll, loading, refresh: fetchNotifications,
+  }), [notifications, unreadCount, markAsRead, markAllAsRead, dismissNotification,
+    addNotification, clearAll, loading, fetchNotifications]);
 
   return (
     <NotificationContext.Provider value={value}>

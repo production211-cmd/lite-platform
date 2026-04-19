@@ -16,7 +16,7 @@ import PortalOrders from "@/pages/vendor/PortalOrders";
 import VendorProducts from "@/pages/vendor/VendorProducts";
 import VendorFinance from "@/pages/vendor/VendorFinance";
 import { LogOut, Package, ShoppingCart, DollarSign, HelpCircle } from "lucide-react";
-import { withErrorBoundary } from "@/components/RouteErrorBoundary";
+import { withErrorBoundary, RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 
 // ============================================================
 // Minimal Top Bar (no sidebar toggle, no search)
@@ -152,11 +152,13 @@ export function VendorPortalShell() {
           <Route path="/vendor/portal/orders" component={withErrorBoundary(PortalOrders, "Portal Orders")} />
           <Route path="/vendor/portal/products" component={withErrorBoundary(VendorProducts, "Portal Products")} />
           <Route path="/vendor/portal/payouts" component={withErrorBoundary(VendorFinance, "Portal Finance")} />
-          <Route path="/vendor/portal/help">{() => <PortalPlaceholder title="Help & Support" />}</Route>
+          <Route path="/vendor/portal/help">{() => <RouteErrorBoundary pageName="Help"><PortalPlaceholder title="Help & Support" /></RouteErrorBoundary>}</Route>
           <Route>
-            <div className="flex items-center justify-center h-[60vh]">
-              <p className="text-gray-500">Page not found</p>
-            </div>
+            <RouteErrorBoundary pageName="Not Found">
+              <div className="flex items-center justify-center h-[60vh]">
+                <p className="text-gray-500">Page not found</p>
+              </div>
+            </RouteErrorBoundary>
           </Route>
         </Switch>
       </main>

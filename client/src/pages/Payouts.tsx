@@ -1,7 +1,7 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
-import { Eye, Wallet, Clock, CheckCircle, ArrowUpRight, DollarSign } from "lucide-react";
+import { formatCurrency, cn } from "@/lib/utils";
+import { Eye, Wallet, Clock, CheckCircle, ArrowUpRight, DollarSign, X, Play } from "lucide-react";
 import {
   useDataGrid, SearchBar, FilterDropdown, PaginationBar,
   DataGrid, ActiveFilters, ExportButton,
@@ -46,8 +46,12 @@ export default function Payouts() {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     api.getPayouts().then((data: any) => {
       const list = Array.isArray(data) ? data : data?.payouts || [];
       setPayouts(list);
@@ -55,18 +59,42 @@ export default function Payouts() {
     }).catch(() => setLoading(false));
   }, []);
 
+  useEffect(() => { load(); }, [load]);
+
+  // Bulk process settlements
+  const handleBulkProcess = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      const result = await api.bulkProcessSettlements(Array.from(selectedIds));
+      setStatusMessage(`${result.processed || selectedIds.size} settlement${selectedIds.size > 1 ? "s" : ""} moved to processing`);
+      setSelectedIds(new Set());
+      load();
+    } catch (err) {
+      console.error(err);
+      setStatusMessage("Bulk process failed — please try again");
+    }
+    setBulkLoading(false);
+    setTimeout(() => setStatusMessage(""), 4000);
+  }, [selectedIds, load]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const normalized = useMemo(() =>
     payouts.map((p) => {
-      // Payout model has a single 'amount' field (the net payout amount)
-      // PayoutItems may provide line-item breakdown
-      const itemsTotal = (p.items || []).reduce((s: number, i: any) => s + (i.amount || 0), 0);
       const net = p.amount || 0;
       return {
         ...p,
         vendorName: p.vendor?.name || "Unknown",
-        gross: net, // amount IS the net payout
-        commission: 0, // not tracked at payout level
-        deductions: 0, // not tracked at payout level
+        gross: net,
+        commission: 0,
+        deductions: 0,
         net,
         date: p.createdAt || "",
         cycle: p.payoutCycle || "—",
@@ -78,6 +106,11 @@ export default function Payouts() {
     if (activeTab === "all") return normalized;
     return normalized.filter((p) => p.status === activeTab);
   }, [normalized, activeTab]);
+
+  // Only PENDING settlements can be bulk-processed
+  const pendingOnPage = useMemo(() =>
+    tabFiltered.filter((p) => p.status === "PENDING"),
+  [tabFiltered]);
 
   const dynamicFilterConfigs = useMemo(() => {
     const vendors = [...new Set(normalized.map((p) => p.vendorName).filter(Boolean))];
@@ -125,7 +158,30 @@ export default function Payouts() {
     return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
+  const selectAllPendingOnPage = () => {
+    const pendingIds = grid.paginated.filter((p: any) => p.status === "PENDING").map((p: any) => p.id);
+    if (pendingIds.length === 0) return;
+    const allSelected = pendingIds.every((id: string) => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingIds));
+    }
+  };
+
   const columns: ColumnDef<any>[] = [
+    {
+      key: "select", label: "", width: "40px",
+      render: (p) => p.status === "PENDING" ? (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(p.id)}
+          onChange={() => toggleSelect(p.id)}
+          className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+          aria-label={`Select settlement for ${p.vendorName}`}
+        />
+      ) : <div className="w-4" />,
+    },
     { key: "vendorName", label: "Vendor", sortable: true, render: (p) => <span className="text-sm font-semibold font-body">{p.vendorName}</span> },
     { key: "periodStart", label: "Period", sortable: true, render: (p) => <span className="text-xs text-gray-500 font-body">{p.periodStart ? `${formatDate(p.periodStart)} – ${formatDate(p.periodEnd)}` : "—"}</span> },
     { key: "net", label: "Amount", sortable: true, align: "right", render: (p) => <span className="text-sm font-bold font-body">{formatCurrency(p.net, p.currency)}</span> },
@@ -189,13 +245,65 @@ export default function Payouts() {
 
       <ActiveFilters filters={grid.filters} filterConfigs={dynamicFilterConfigs} search={grid.search} onRemoveFilter={(key) => grid.setFilter(key, key === "vendorName" || key === "currency" ? [] : "")} onClearSearch={() => grid.setSearch("")} onClearAll={() => { grid.clearFilters(); setActiveTab("all"); }} />
 
+      {/* Screen reader announcement for bulk actions */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">{statusMessage}</div>
+
+      {/* Bulk Action Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="bg-gray-900 text-white rounded-xl px-5 py-3 flex items-center justify-between shadow-lg animate-in slide-in-from-bottom-2">
+          <span className="text-sm font-medium">{selectedIds.size} settlement{selectedIds.size > 1 ? "s" : ""} selected</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBulkProcess}
+              disabled={bulkLoading}
+              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              <Play size={14} /> Process All
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              aria-label="Clear selection"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Status toast */}
+      {statusMessage && (
+        <div className={cn(
+          "rounded-lg px-4 py-2.5 text-sm font-medium flex items-center gap-2",
+          statusMessage.includes("failed")
+            ? "bg-red-50 border border-red-200 text-red-800"
+            : "bg-emerald-50 border border-emerald-200 text-emerald-800"
+        )}>
+          <CheckCircle size={16} /> {statusMessage}
+        </div>
+      )}
+
       <div className="tab-bar">
         {STATUS_TABS.map((tab) => (
-          <button key={tab.key} onClick={() => { setActiveTab(tab.key); grid.setSearch(""); }} className={`tab-item ${activeTab === tab.key ? "active" : ""}`}>
+          <button key={tab.key} onClick={() => { setActiveTab(tab.key); grid.setSearch(""); setSelectedIds(new Set()); }} className={`tab-item ${activeTab === tab.key ? "active" : ""}`}>
             {tab.label} ({tabCounts[tab.key] || 0})
           </button>
         ))}
       </div>
+
+      {/* Select All Pending header — only show when on Pending tab or All tab with pending items */}
+      {pendingOnPage.length > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
+          <input
+            type="checkbox"
+            checked={pendingOnPage.length > 0 && pendingOnPage.every((p) => selectedIds.has(p.id))}
+            onChange={selectAllPendingOnPage}
+            className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+            aria-label="Select all pending settlements on this page"
+          />
+          <span className="text-xs text-gray-500">{pendingOnPage.length} pending settlement{pendingOnPage.length !== 1 ? "s" : ""} on this page</span>
+        </div>
+      )}
 
       <DataGrid columns={columns} data={grid.paginated} sort={grid.sort} onSort={grid.toggleSort} emptyMessage="No payouts found" emptyIcon={Wallet} />
 
